@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sendline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="orb orb-a" aria-hidden="true"></div>
+  <div class="orb orb-b" aria-hidden="true"></div>
+
+  <main class="stage">
+    <header class="brand">
+      <p class="brand-mark">Sendline</p>
+      <p class="brand-line">Queue the names. Launch the worker. Watch it move.</p>
+    </header>
+
+    <section class="workspace" aria-label="Campaign controls">
+      <div class="panel">
+        <div class="field">
+          <div class="field-head">
+            <label for="names">People</label>
+            <span class="meta" id="nameCount">0</span>
+          </div>
+          <textarea id="names" spellcheck="false" placeholder="One full name per line"></textarea>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="message">Message</label>
+            <span class="meta tip">use {name}</span>
+          </div>
+          <textarea id="message" spellcheck="true" placeholder="Hi {name},"></textarea>
+        </div>
+
+        <div class="field compact">
+          <div class="field-head">
+            <label for="attachment">Attachment path</label>
+            <span class="meta tip">optional</span>
+          </div>
+          <input id="attachment" type="text" placeholder="C:\path\to\file.pdf" />
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn ghost" id="saveBtn">Save</button>
+          <button type="button" class="btn danger" id="stopBtn" hidden>Stop</button>
+          <button type="button" class="btn primary" id="runBtn">
+            <span class="btn-label">Launch worker</span>
+            <span class="btn-shine" aria-hidden="true"></span>
+          </button>
+        </div>
+        <p class="status" id="status" role="status"></p>
+      </div>
+
+      <aside class="log-panel" aria-label="Live worker log">
+        <div class="log-head">
+          <span class="log-title">Live run</span>
+          <span class="pulse" id="pulse" data-state="idle"></span>
+        </div>
+        <pre id="log" class="log"></pre>
+      </aside>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
