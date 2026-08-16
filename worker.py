@@ -281,16 +281,65 @@ def _clear_profile_locks(folder: Path) -> None:
             pass
 
 
-def _sync_mike_profile() -> None:
-    """Copy Profile 7 (Mike) into chrome_automation_data/Default for automation."""
+def _list_chrome_profiles() -> list[tuple[str, str, str]]:
+    """Return (folder, display_name, email) for profiles under Chrome User Data."""
+    found: list[tuple[str, str, str]] = []
+    local_state = CHROME_USER_DATA / "Local State"
+    info: dict = {}
+    if local_state.is_file():
+        try:
+            info = json.loads(local_state.read_text(encoding="utf-8")).get("profile", {}).get("info_cache", {}) or {}
+        except Exception:
+            info = {}
+
+    folders: list[str] = []
+    if CHROME_USER_DATA.is_dir():
+        for child in sorted(CHROME_USER_DATA.iterdir()):
+            if child.is_dir() and (child.name == "Default" or child.name.startswith("Profile ")):
+                folders.append(child.name)
+    for folder in folders:
+        meta = info.get(folder) or {}
+        display = str(meta.get("name") or "")
+        email = str(meta.get("user_name") or meta.get("gaia_name") or "")
+        found.append((folder, display, email))
+    return found
+
+
+def _print_chrome_profiles() -> None:
+    profiles = _list_chrome_profiles()
+    print(f"Chrome User Data: {CHROME_USER_DATA}")
+    if not profiles:
+        print("  (no Default / Profile * folders found)")
+        return
+    print("Available Chrome profiles on this machine:")
+    for folder, display, email in profiles:
+        label = display or "(no display name)"
+        mail = f" <{email}>" if email else ""
+        mark = "  <- CHROME_PROFILE" if folder == CHROME_PROFILE else ""
+        print(f"  {folder}: {label}{mail}{mark}")
+    print('Set CHROME_PROFILE in worker.py to the Folder name (e.g. "Default" or "Profile 1").')
+
+
+def _ensure_automation_profile_dir() -> None:
+    dst = AUTOMATION_USER_DATA / "Default"
+    AUTOMATION_USER_DATA.mkdir(parents=True, exist_ok=True)
+    dst.mkdir(parents=True, exist_ok=True)
+    _clear_profile_locks(AUTOMATION_USER_DATA)
+    _clear_profile_locks(dst)
+
+
+def _sync_source_profile() -> bool:
+    """Copy CHROME_PROFILE into chrome_automation_data/Default. Returns True if synced."""
     src = CHROME_USER_DATA / CHROME_PROFILE
     dst = AUTOMATION_USER_DATA / "Default"
     if not src.is_dir():
-        raise FileNotFoundError(f"Chrome profile not found: {src}")
+        print(f"[WARN] Source profile not found: {src}")
+        _print_chrome_profiles()
+        return False
 
     AUTOMATION_USER_DATA.mkdir(parents=True, exist_ok=True)
     dst.mkdir(parents=True, exist_ok=True)
-    print(f"Syncing logged-in profile '{CHROME_PROFILE}' (Mike) → {dst}")
+    print(f"Syncing Chrome profile '{CHROME_PROFILE}' → {dst}")
 
     # Exclude bulky/cache dirs; keep cookies + local storage (login session).
     cmd = [
@@ -326,19 +375,24 @@ def _sync_mike_profile() -> None:
 
     _clear_profile_locks(AUTOMATION_USER_DATA)
     _clear_profile_locks(dst)
+    return True
 
 
 def start_or_attach_chrome() -> webdriver.Chrome:
-    print(f"Source profile: {CHROME_PROFILE} under {CHROME_USER_DATA}")
+    print(f"Configured source profile: {CHROME_PROFILE} under {CHROME_USER_DATA}")
     print("Closing Chrome so the automation profile can be opened...")
     _kill_chrome()
 
     cookies_path = AUTOMATION_USER_DATA / "Default" / "Network" / "Cookies"
     if RESYNC_FROM_MIKE_EACH_RUN or not cookies_path.exists():
-        _sync_mike_profile()
+        synced = _sync_source_profile()
+        if not synced:
+            print("Starting a fresh automation Chrome profile instead.")
+            print("Sign into LinkedIn once in the opened window; later runs will reuse it.")
+            _ensure_automation_profile_dir()
     else:
         print(f"Reusing automation profile at {AUTOMATION_USER_DATA}")
-        print("(Keeps LinkedIn login. Set RESYNC_FROM_MIKE_EACH_RUN = True to re-copy from Mike.)")
+        print("(Keeps LinkedIn login. Set RESYNC_FROM_MIKE_EACH_RUN = True to re-copy from source profile.)")
         _clear_profile_locks(AUTOMATION_USER_DATA)
         _clear_profile_locks(AUTOMATION_USER_DATA / "Default")
 
