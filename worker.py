@@ -146,6 +146,13 @@ SELECTORS = {
     "file_input": [
         (By.XPATH, "//div[.//h2[contains(.,'New message')]]//form//input[@type='file']")
     ],
+    "attachment_preview": [
+        (By.XPATH, "//div[.//h2[contains(.,'New message')]]//form//*[contains(@class,'msg-form__attachment')]"),
+        (By.XPATH, "//div[.//h2[contains(.,'New message')]]//form//*[contains(@class,'attachment-preview')]"),
+        (By.XPATH, "//div[.//h2[contains(.,'New message')]]//form//*[contains(@class,'msg-form__file')]"),
+        (By.CSS_SELECTOR, "form [class*='msg-form__attachment']"),
+        (By.CSS_SELECTOR, "form [class*='attachment-preview']"),
+    ],
     "send_button": [
         (By.XPATH, "//div[.//h2[contains(.,'New message')]]//form//button[contains(@class,'msg-form__send-button') and not(@disabled)]")
     ],
@@ -224,6 +231,82 @@ def click_js(driver, el):
 
 def editor_text_len(driver, el) -> int:
     return driver.execute_script("return (arguments[0].innerText || '').trim().length;", el)
+
+def _js_close_attachment_upload_box(driver) -> str:
+    """Click Done/Dismiss on LinkedIn's attach overlay, not the remove-file control."""
+    return driver.execute_script(
+        """
+        const isVisible = (el) => {
+          if (!el) return false;
+          const s = window.getComputedStyle(el);
+          const r = el.getBoundingClientRect();
+          return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+        };
+        const textOf = (el) => ((el && (el.innerText || el.textContent)) || '').trim();
+        const labelOf = (el) => ((el && (el.getAttribute('aria-label') || el.getAttribute('title'))) || '');
+        const headingOf = (root) => textOf(root.querySelector('h1, h2, h3, header, .artdeco-modal__header'));
+        const looksLikeAttachUi = (root) => {
+          const blob = (headingOf(root) + ' ' + textOf(root) + ' ' + labelOf(root)).toLowerCase();
+          return /attach|upload|file|document|photo|media/.test(blob)
+            || !!root.querySelector('input[type="file"]');
+        };
+        const roots = [...document.querySelectorAll('.artdeco-modal, [role="dialog"], [class*="artdeco-modal"]')]
+          .filter(isVisible)
+          .filter((el) => !/^new message$/i.test(headingOf(el)))
+          .filter(looksLikeAttachUi);
+        for (const root of roots) {
+          const buttons = [...root.querySelectorAll('button')].filter(isVisible);
+          const done = buttons.find((b) => /^(done|add|insert)$/i.test(textOf(b)));
+          if (done) { done.click(); return 'done'; }
+          const dismiss = buttons.find((b) => {
+            const a = (labelOf(b) + ' ' + textOf(b)).toLowerCase();
+            if (/remove|delete|cancel/.test(a)) return false;
+            return /dismiss|close/.test(a)
+              || (b.className || '').toString().includes('artdeco-modal__dismiss');
+          });
+          if (dismiss) { dismiss.click(); return 'dismiss'; }
+        }
+        return '';
+        """
+    )
+
+
+def wait_for_attachment_preview() -> None:
+    try:
+        wait_for_any(driver, SELECTORS["attachment_preview"], EC.presence_of_element_located, TIMEOUTS["ui"])
+        print("Attachment preview is in the message.")
+    except TimeoutException:
+        print("[INFO] Couldn’t confirm the attachment preview; continuing.")
+
+
+def close_attachment_upload_box() -> None:
+    """Close LinkedIn's upload/attachment box after the file is attached, then refocus the editor."""
+    print("Closing LinkedIn attachment box…")
+    for _ in range(5):
+        if should_stop():
+            raise StopRequested()
+        clicked = ""
+        try:
+            clicked = _js_close_attachment_upload_box(driver) or ""
+        except Exception:
+            clicked = ""
+        if not clicked:
+            break
+        print(f"Dismissed attachment box ({clicked}).")
+        interruptible_sleep(0.45)
+    try:
+        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+    except Exception:
+        pass
+    interruptible_sleep(0.35)
+    try:
+        editor = wait_for_any(driver, SELECTORS["editor"], EC.presence_of_element_located, TIMEOUTS["short"])
+        scroll_into_view(driver, editor)
+        click_js(driver, editor)
+    except Exception:
+        pass
+    interruptible_sleep(0.4)
+    print("Attachment box closed.")
 
 def paste_message_via_clipboard(driver, el, text: str) -> bool:
     """
@@ -647,17 +730,40 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
             print("[ERROR] Editor still empty after paste/typing; skipping send.")
             return
 
-        # Attach file (optional)
+        # Attach file (optional), then close LinkedIn's upload box before Send.
         if attachment_path:
+            attach_file = str(Path(attachment_path))
+            if not Path(attach_file).is_file():
+                print(f"[ERROR] Attachment file not found: {attach_file}")
+                return
+            file_input = None
             try:
-                attach_btn = wait_for_any(driver, SELECTORS["attach_button_any"], EC.element_to_be_clickable, TIMEOUTS["short"])
-                click_js(driver, attach_btn)
+                file_input = wait_for_any(driver, SELECTORS["file_input"], EC.presence_of_element_located, 3)
             except TimeoutException:
+                try:
+                    attach_btn = wait_for_any(
+                        driver, SELECTORS["attach_button_any"], EC.element_to_be_clickable, TIMEOUTS["short"]
+                    )
+                    click_js(driver, attach_btn)
+                    interruptible_sleep(0.4)
+                except TimeoutException:
+                    print("[WARN] Could not find the Attach button.")
+                file_input = wait_for_any(
+                    driver, SELECTORS["file_input"], EC.presence_of_element_located, TIMEOUTS["short"]
+                )
+            file_input.send_keys(attach_file)
+            try:
+                driver.execute_script(
+                    "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));"
+                    "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+                    file_input,
+                )
+            except Exception:
                 pass
-            file_input = wait_for_any(driver, SELECTORS["file_input"], EC.presence_of_element_located, TIMEOUTS["short"])
-            file_input.send_keys(str(Path(attachment_path)))
             print("File attached.")
+            wait_for_attachment_preview()
             interruptible_sleep(SLEEPS["after_attach"])
+            close_attachment_upload_box()
         else:
             print("No attachment path provided; sending text only.")
 
