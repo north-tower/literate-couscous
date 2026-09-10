@@ -24,10 +24,10 @@ from selenium.common.exceptions import (
 )
 
 # =========================
-# YOUR SETTINGS (Hardcoded)
+# YOUR SETTINGS (Hardcoded fallbacks — UI config overrides these)
 # =========================
-EMAIL = "turneredward@gmail.com"
-PASSWORD = "turneredward"
+EMAIL = ""
+PASSWORD = ""
 people_names = [
     "Paul Rees",
     "Jose Delgado",
@@ -120,6 +120,19 @@ SELECTORS = {
         (By.CSS_SELECTOR, "input[name='session_password']"),
         (By.CSS_SELECTOR, "input#session_password"),
         (By.CSS_SELECTOR, "input[autocomplete='current-password']"),
+        (By.CSS_SELECTOR, "input[type='password']"),
+    ],
+    "login_submit": [
+        (By.CSS_SELECTOR, "button[type='submit']"),
+        (By.CSS_SELECTOR, "button[data-id='sign-in-form__submit-btn']"),
+        (By.CSS_SELECTOR, "button[data-litms-control-urn='login-submit']"),
+        (By.CSS_SELECTOR, "input[type='submit']"),
+        (By.CSS_SELECTOR, ".login__form_action_container button"),
+        (By.CSS_SELECTOR, "button.from__button--floating"),
+        (By.XPATH, "//button[contains(.,'Sign in')]"),
+        (By.XPATH, "//button[contains(.,'Sign In')]"),
+        (By.XPATH, "//button[normalize-space()='Continue']"),
+        (By.XPATH, "//button[normalize-space()='Next']"),
     ],
     "login_ok_any": [
         (By.ID, "global-nav-typeahead"),
@@ -586,11 +599,13 @@ driver = None  # set in __main__ after loading UI config
 
 
 def load_run_config():
-    """Load names/message/attachment from run_config.json (written by the UI)."""
+    """Load names/message/attachment/credentials from run_config.json (written by the UI)."""
     cfg_path = Path(__file__).resolve().parent / "run_config.json"
     names = list(people_names)
     template = MESSAGE_TEMPLATE
     attachment = ATTACHMENT_PATH
+    email = EMAIL
+    password = PASSWORD
     if cfg_path.is_file():
         try:
             data = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -605,10 +620,16 @@ def load_run_config():
                 attachment = str(att)
             elif att is None or att == "":
                 attachment = None
+            user = data.get("linkedin_username") or data.get("email")
+            if isinstance(user, str) and user.strip():
+                email = user.strip()
+            pwd = data.get("linkedin_password") if data.get("linkedin_password") is not None else data.get("password")
+            if isinstance(pwd, str) and pwd:
+                password = pwd
             print(f"Loaded run_config.json ({len(names)} people).")
         except Exception as exc:
             print(f"[WARN] Could not read run_config.json: {exc}")
-    return names, template, attachment
+    return names, template, attachment, email, password
 
 
 # =========================
@@ -654,8 +675,7 @@ def _is_logged_in(timeout: int = 5) -> bool:
 
 def _wait_for_manual_login(timeout: int = 300) -> None:
     print(
-        "Log into LinkedIn manually in this Chrome window "
-        "(use the same account as Mike). Waiting…"
+        "If LinkedIn shows a check or extra step, complete it in this Chrome window. Waiting…"
     )
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -665,13 +685,48 @@ def _wait_for_manual_login(timeout: int = 300) -> None:
             print("Logged in to LinkedIn.")
             return
         interruptible_sleep(2)
-    _dump_login_debug("Manual login timed out")
-    raise TimeoutException("Manual LinkedIn login timed out.")
+    _dump_login_debug("LinkedIn login timed out")
+    raise TimeoutException("LinkedIn login timed out.")
+
+
+def _fill_input(el, value: str) -> None:
+    scroll_into_view(driver, el)
+    click_js(driver, el)
+    interruptible_sleep(0.15)
+    try:
+        el.send_keys(Keys.CONTROL, "a")
+        el.send_keys(Keys.DELETE)
+    except Exception:
+        pass
+    try:
+        driver.execute_script(
+            "arguments[0].value = '';"
+            "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            el,
+        )
+    except Exception:
+        pass
+    el.send_keys(value)
+    try:
+        driver.execute_script(
+            "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));"
+            "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+            el,
+        )
+    except Exception:
+        pass
+
+
+def _click_login_submit() -> bool:
+    try:
+        btn = wait_for_any(driver, SELECTORS["login_submit"], EC.element_to_be_clickable, TIMEOUTS["short"])
+        click_js(driver, btn)
+        return True
+    except TimeoutException:
+        return False
 
 
 def login_to_linkedin(email: str, password: str) -> None:
-    # Copied Chrome cookies often don't transfer LinkedIn auth on modern Chrome.
-    # Keep this automation profile logged in after one manual sign-in.
     print("Opening LinkedIn feed…")
     driver.get("https://www.linkedin.com/feed/")
     interruptible_sleep(4)
@@ -679,11 +734,48 @@ def login_to_linkedin(email: str, password: str) -> None:
         print("Already logged in — continuing.")
         return
 
-    print("LinkedIn session not active in the automation profile.")
-    print("Sign in once in the opened Chrome window; later runs will reuse it.")
+    if not email or not password:
+        print("[ERROR] LinkedIn username/password missing. Add them in Sendline, then launch again.")
+        driver.get("https://www.linkedin.com/login")
+        interruptible_sleep(2)
+        _wait_for_manual_login(300)
+        return
+
+    print(f"Signing in to LinkedIn as {email}…")
     driver.get("https://www.linkedin.com/login")
     interruptible_sleep(2)
-    _wait_for_manual_login(300)
+
+    try:
+        user_el = wait_for_any(driver, SELECTORS["login_username"], EC.visibility_of_element_located, TIMEOUTS["ui"])
+        _fill_input(user_el, email)
+        interruptible_sleep(0.4)
+
+        try:
+            pwd_el = wait_for_any(driver, SELECTORS["login_password"], EC.visibility_of_element_located, 5)
+        except TimeoutException:
+            print("Username entered — continuing to the password step…")
+            _click_login_submit()
+            interruptible_sleep(1.2)
+            pwd_el = wait_for_any(driver, SELECTORS["login_password"], EC.visibility_of_element_located, TIMEOUTS["ui"])
+
+        _fill_input(pwd_el, password)
+        interruptible_sleep(0.4)
+        if not _click_login_submit():
+            try:
+                pwd_el.send_keys(Keys.ENTER)
+            except Exception:
+                pass
+        print("Credentials submitted. Waiting for LinkedIn…")
+        interruptible_sleep(3)
+        if _is_logged_in(20):
+            print("Logged in to LinkedIn.")
+            return
+        print("Login not finished yet — complete any extra LinkedIn check in Chrome if shown.")
+        _wait_for_manual_login(180)
+    except TimeoutException:
+        _dump_login_debug("Could not fill LinkedIn login form")
+        print("[WARN] Could not fill the login form. Complete sign-in in Chrome.")
+        _wait_for_manual_login(180)
 
 # =========================
 # New message flow
@@ -786,9 +878,9 @@ if __name__ == "__main__":
     clear_stop_flag()
     stopped = False
     try:
-        run_names, run_template, run_attachment = load_run_config()
+        run_names, run_template, run_attachment, run_email, run_password = load_run_config()
         driver = start_or_attach_chrome()
-        login_to_linkedin(EMAIL, PASSWORD)
+        login_to_linkedin(run_email, run_password)
 
         for full_name in run_names:
             if should_stop():

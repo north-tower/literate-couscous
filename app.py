@@ -50,9 +50,23 @@ def _default_config() -> dict:
     return {
         "people_names": [],
         "message_template": "Hi {name},\n\n",
+        "linkedin_username": "",
+        "linkedin_password": "",
         "attachment_path": None,
         "attachment_name": None,
     }
+
+
+def _clean_username(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _clean_password(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.replace("\r\n", "").replace("\n", "")
 
 
 def _safe_attachment_name(filename: str) -> str:
@@ -113,6 +127,8 @@ def read_config() -> dict:
     return {
         "people_names": [n for n in names if isinstance(n, str) and n.strip()],
         "message_template": data.get("message_template") or "",
+        "linkedin_username": _clean_username(data.get("linkedin_username")),
+        "linkedin_password": _clean_password(data.get("linkedin_password")),
         "attachment_path": attachment_path,
         "attachment_name": attachment_name,
     }
@@ -133,6 +149,8 @@ def write_config(data: dict) -> dict:
     payload = {
         "people_names": names,
         "message_template": (data.get("message_template") or "").replace("\r\n", "\n"),
+        "linkedin_username": _clean_username(data.get("linkedin_username")),
+        "linkedin_password": _clean_password(data.get("linkedin_password")),
         "attachment_path": attachment_path,
         "attachment_name": attachment_name,
     }
@@ -362,6 +380,8 @@ def api_run():
         return jsonify({"ok": False, "error": "Add at least one name before launching."}), 400
     if "{name}" not in saved["message_template"]:
         return jsonify({"ok": False, "error": "Message must include {name} for personalization."}), 400
+    if not saved.get("linkedin_username") or not saved.get("linkedin_password"):
+        return jsonify({"ok": False, "error": "Add your LinkedIn username and password before launching."}), 400
 
     with _lock:
         if _state["running"]:

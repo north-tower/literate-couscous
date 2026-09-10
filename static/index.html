@@ -22,6 +22,26 @@
 
     <section class="workspace" aria-label="Campaign controls">
       <div class="panel">
+        <div class="field-block" id="linkedinField">
+          <div class="field-head">
+            <span class="field-label">LinkedIn</span>
+            <span class="meta tip">used to sign in</span>
+          </div>
+          <div class="cred-grid">
+            <div class="field compact">
+              <label for="linkedinUsername">Username</label>
+              <input id="linkedinUsername" type="text" autocomplete="username" spellcheck="false" placeholder="Email or phone" />
+            </div>
+            <div class="field compact">
+              <label for="linkedinPassword">Password</label>
+              <div class="password-wrap">
+                <input id="linkedinPassword" type="password" autocomplete="current-password" placeholder="Password" />
+                <button type="button" class="text-btn" id="togglePasswordBtn" aria-pressed="false" aria-controls="linkedinPassword">Show</button>
+              </div>
+            </div>
+          </div>
+          <p class="field-hint">The worker fills these on LinkedIn if you are not already signed in. Stored only on this computer.</p>
+        </div>
         <div class="field" id="namesField">
           <div class="field-head">
             <label for="names">People</label>

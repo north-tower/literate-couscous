@@ -243,7 +243,9 @@ label,
 .meta.tip { opacity: 0.8; }
 
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="password"],
+input[type="email"] {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -256,9 +258,51 @@ input[type="text"] {
 }
 
 textarea:focus,
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
   border-color: rgba(15, 122, 98, 0.55);
   box-shadow: 0 0 0 3px rgba(15, 122, 98, 0.14);
+}
+
+.cred-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.password-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  padding-right: 0.85rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.password-wrap:focus-within {
+  border-color: rgba(15, 122, 98, 0.55);
+  box-shadow: 0 0 0 3px rgba(15, 122, 98, 0.14);
+}
+
+.password-wrap input[type="password"],
+.password-wrap input[type="text"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 0.4rem;
+}
+
+.password-wrap input:focus {
+  box-shadow: none;
+}
+
+.password-wrap .text-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 #names {

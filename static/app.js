@@ -6,6 +6,9 @@ const uploadProgress = document.getElementById("uploadProgress");
 const uploadProgressFill = document.getElementById("uploadProgressFill");
 const uploadProgressLabel = document.getElementById("uploadProgressLabel");
 const messageEl = document.getElementById("message");
+const linkedinUsernameEl = document.getElementById("linkedinUsername");
+const linkedinPasswordEl = document.getElementById("linkedinPassword");
+const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 const attachmentField = document.getElementById("attachmentField");
 const attachmentFileEl = document.getElementById("attachmentFile");
 const uploadAttachmentBtn = document.getElementById("uploadAttachmentBtn");
@@ -54,6 +57,8 @@ function payloadFromForm() {
   return {
     people_names: parseNames(namesEl.value),
     message_template: messageEl.value,
+    linkedin_username: (linkedinUsernameEl.value || "").trim(),
+    linkedin_password: linkedinPasswordEl.value || "",
     attachment_path: attachmentPath,
     attachment_name: attachmentName,
   };
@@ -75,6 +80,8 @@ function setAttachmentUi() {
 function applyConfig(cfg) {
   namesEl.value = (cfg.people_names || []).join("\n");
   messageEl.value = cfg.message_template || "";
+  linkedinUsernameEl.value = cfg.linkedin_username || "";
+  linkedinPasswordEl.value = cfg.linkedin_password || "";
   attachmentPath = cfg.attachment_path || null;
   attachmentName = cfg.attachment_name || fileNameFromPath(attachmentPath) || null;
   setAttachmentUi();
@@ -412,6 +419,9 @@ function setRunningUi(running) {
   stopBtn.hidden = !running;
   uploadAttachmentBtn.disabled = running || attachmentUploading;
   clearAttachmentBtn.disabled = running;
+  linkedinUsernameEl.disabled = running;
+  linkedinPasswordEl.disabled = running;
+  togglePasswordBtn.disabled = running;
   if (!running) stopBtn.disabled = false;
   if (running) pulseEl.dataset.state = "running";
 }
@@ -458,6 +468,12 @@ function startPolling() {
 
 async function launch() {
   try {
+    const creds = payloadFromForm();
+    if (!creds.linkedin_username || !creds.linkedin_password) {
+      setStatus("Add your LinkedIn username and password before launching.", "error");
+      pulseEl.dataset.state = "error";
+      return;
+    }
     setStatus("Starting…");
     logEl.textContent = "";
     logCursor = 0;
@@ -506,6 +522,13 @@ namesEl.addEventListener("input", updateCount);
 saveBtn.addEventListener("click", () => saveConfig(false));
 runBtn.addEventListener("click", launch);
 stopBtn.addEventListener("click", stop);
+
+togglePasswordBtn.addEventListener("click", () => {
+  const show = linkedinPasswordEl.type === "password";
+  linkedinPasswordEl.type = show ? "text" : "password";
+  togglePasswordBtn.textContent = show ? "Hide" : "Show";
+  togglePasswordBtn.setAttribute("aria-pressed", show ? "true" : "false");
+});
 
 uploadNamesBtn.addEventListener("click", () => namesFileEl.click());
 namesFileEl.addEventListener("change", () => {
