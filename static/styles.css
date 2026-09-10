@@ -188,6 +188,11 @@ a.text-btn {
   box-shadow: 0 0 0 3px rgba(15, 122, 98, 0.14);
 }
 
+.field.drop-ready .attach-row {
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgba(15, 122, 98, 0.14);
+}
+
 .upload-progress {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -221,7 +226,8 @@ a.text-btn {
   color: var(--ink-soft);
 }
 
-label {
+label,
+.field-label {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
@@ -268,8 +274,26 @@ input[type="text"]:focus {
   resize: vertical;
 }
 
-.field.compact input {
-  padding-block: 0.75rem;
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.attach-name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-name.has-file {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .actions {

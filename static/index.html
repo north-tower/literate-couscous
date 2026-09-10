@@ -50,12 +50,24 @@
           <textarea id="message" spellcheck="true" placeholder="Hi {name},"></textarea>
         </div>
 
-        <div class="field compact">
+        <div class="field compact" id="attachmentField">
           <div class="field-head">
-            <label for="attachment">Attachment path</label>
+            <span class="field-label" id="attachmentLabel">Attachment</span>
             <span class="meta tip">optional</span>
           </div>
-          <input id="attachment" type="text" placeholder="C:\path\to\file.pdf" />
+          <input type="file" id="attachmentFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.gif" hidden />
+          <div class="attach-row">
+            <button type="button" class="btn ghost" id="uploadAttachmentBtn">Choose file</button>
+            <span class="attach-name" id="attachmentName">No file chosen</span>
+            <button type="button" class="text-btn" id="clearAttachmentBtn" hidden>Remove</button>
+          </div>
+          <p class="field-hint">PDF, Word, PowerPoint, Excel, or image — attached to every message.</p>
+          <div class="upload-progress" id="attachmentProgress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" id="attachmentProgressFill"></div>
+            </div>
+            <span class="progress-label" id="attachmentProgressLabel">0%</span>
+          </div>
         </div>
 
         <div class="actions">

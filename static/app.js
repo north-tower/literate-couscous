@@ -6,7 +6,14 @@ const uploadProgress = document.getElementById("uploadProgress");
 const uploadProgressFill = document.getElementById("uploadProgressFill");
 const uploadProgressLabel = document.getElementById("uploadProgressLabel");
 const messageEl = document.getElementById("message");
-const attachmentEl = document.getElementById("attachment");
+const attachmentField = document.getElementById("attachmentField");
+const attachmentFileEl = document.getElementById("attachmentFile");
+const uploadAttachmentBtn = document.getElementById("uploadAttachmentBtn");
+const clearAttachmentBtn = document.getElementById("clearAttachmentBtn");
+const attachmentNameEl = document.getElementById("attachmentName");
+const attachmentProgress = document.getElementById("attachmentProgress");
+const attachmentProgressFill = document.getElementById("attachmentProgressFill");
+const attachmentProgressLabel = document.getElementById("attachmentProgressLabel");
 const nameCountEl = document.getElementById("nameCount");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
@@ -23,6 +30,9 @@ const TEMPLATE_ERROR =
 let logCursor = 0;
 let pollTimer = null;
 let namesImporting = false;
+let attachmentPath = null;
+let attachmentName = null;
+let attachmentUploading = false;
 
 function parseNames(text) {
   return text
@@ -41,18 +51,33 @@ function setStatus(text, kind = "") {
 }
 
 function payloadFromForm() {
-  const attachment = attachmentEl.value.trim();
   return {
     people_names: parseNames(namesEl.value),
     message_template: messageEl.value,
-    attachment_path: attachment || null,
+    attachment_path: attachmentPath,
+    attachment_name: attachmentName,
   };
+}
+
+function fileNameFromPath(path) {
+  if (!path) return "";
+  const parts = String(path).split(/[/\\]/);
+  return parts[parts.length - 1] || path;
+}
+
+function setAttachmentUi() {
+  const hasFile = Boolean(attachmentPath);
+  attachmentNameEl.textContent = hasFile ? attachmentName || fileNameFromPath(attachmentPath) : "No file chosen";
+  attachmentNameEl.classList.toggle("has-file", hasFile);
+  clearAttachmentBtn.hidden = !hasFile;
 }
 
 function applyConfig(cfg) {
   namesEl.value = (cfg.people_names || []).join("\n");
   messageEl.value = cfg.message_template || "";
-  attachmentEl.value = cfg.attachment_path || "";
+  attachmentPath = cfg.attachment_path || null;
+  attachmentName = cfg.attachment_name || fileNameFromPath(attachmentPath) || null;
+  setAttachmentUi();
   updateCount();
 }
 
@@ -296,9 +321,97 @@ function isNamesFile(file) {
   return Boolean(file && fileKind(file));
 }
 
+const ATTACHMENT_EXTS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".gif"];
+
+function isAttachmentFile(file) {
+  const name = (file && file.name ? file.name : "").toLowerCase();
+  return ATTACHMENT_EXTS.some((ext) => name.endsWith(ext));
+}
+
+function showAttachmentProgress(pct) {
+  attachmentProgress.hidden = false;
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  attachmentProgressFill.style.width = clamped + "%";
+  attachmentProgressLabel.textContent = clamped + "%";
+  attachmentProgress.setAttribute("aria-valuenow", String(clamped));
+}
+
+function hideAttachmentProgress() {
+  attachmentProgress.hidden = true;
+  attachmentProgressFill.style.width = "0%";
+  attachmentProgressLabel.textContent = "0%";
+}
+
+function uploadAttachmentFile(file) {
+  if (!file || attachmentUploading) return;
+  if (!isAttachmentFile(file)) {
+    setStatus("Please attach a PDF, Word, PowerPoint, Excel, or image file.", "error");
+    return;
+  }
+
+  attachmentUploading = true;
+  uploadAttachmentBtn.disabled = true;
+  showAttachmentProgress(2);
+  setStatus("Uploading " + file.name + "…");
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/attachment");
+  xhr.upload.addEventListener("progress", (event) => {
+    if (!event.lengthComputable) return;
+    showAttachmentProgress((event.loaded / event.total) * 100);
+  });
+  xhr.addEventListener("load", () => {
+    attachmentUploading = false;
+    uploadAttachmentBtn.disabled = false;
+    attachmentFileEl.value = "";
+    hideAttachmentProgress();
+    let data = {};
+    try {
+      data = JSON.parse(xhr.responseText);
+    } catch (_) {}
+    if (xhr.status < 200 || xhr.status >= 300 || !data.ok) {
+      setStatus(data.error || "Attachment upload failed", "error");
+      return;
+    }
+    attachmentPath = data.attachment_path;
+    attachmentName = data.attachment_name;
+    setAttachmentUi();
+    setStatus("Attached " + attachmentName, "ok");
+  });
+  xhr.addEventListener("error", () => {
+    attachmentUploading = false;
+    uploadAttachmentBtn.disabled = false;
+    attachmentFileEl.value = "";
+    hideAttachmentProgress();
+    setStatus("Cannot reach Sendline server. Run: py app.py", "error");
+  });
+  const body = new FormData();
+  body.append("file", file);
+  xhr.send(body);
+}
+
+async function clearAttachment() {
+  try {
+    const res = await fetch("/api/attachment", { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setStatus(data.error || "Could not remove attachment", "error");
+      return;
+    }
+    attachmentPath = null;
+    attachmentName = null;
+    setAttachmentUi();
+    setStatus("Attachment removed", "ok");
+  } catch (_) {
+    setStatus("Cannot reach Sendline server", "error");
+  }
+}
+
 function setRunningUi(running) {
   runBtn.disabled = running;
   stopBtn.hidden = !running;
+  uploadAttachmentBtn.disabled = running || attachmentUploading;
+  clearAttachmentBtn.disabled = running;
   if (!running) stopBtn.disabled = false;
   if (running) pulseEl.dataset.state = "running";
 }
@@ -422,6 +535,33 @@ namesField.addEventListener("drop", (event) => {
     return;
   }
   importNamesFile(file);
+});
+
+uploadAttachmentBtn.addEventListener("click", () => attachmentFileEl.click());
+attachmentFileEl.addEventListener("change", () => {
+  const file = attachmentFileEl.files && attachmentFileEl.files[0];
+  if (file) uploadAttachmentFile(file);
+});
+clearAttachmentBtn.addEventListener("click", () => clearAttachment());
+
+attachmentField.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  attachmentField.classList.add("drop-ready");
+});
+attachmentField.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+});
+attachmentField.addEventListener("dragleave", (event) => {
+  if (attachmentField.contains(event.relatedTarget)) return;
+  attachmentField.classList.remove("drop-ready");
+});
+attachmentField.addEventListener("drop", (event) => {
+  event.preventDefault();
+  attachmentField.classList.remove("drop-ready");
+  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+  if (!file) return;
+  uploadAttachmentFile(file);
 });
 
 loadConfig().catch(() => setStatus("Could not load config — is py app.py running?", "error"));

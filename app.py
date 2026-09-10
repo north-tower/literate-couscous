@@ -4,20 +4,37 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "run_config.json"
 STOP_FLAG = ROOT / "sendline.stop"
 STATIC_DIR = ROOT / "static"
+ATTACHMENTS_DIR = ROOT / "attachments"
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+ALLOWED_ATTACHMENT_EXT = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+}
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
+app.config["MAX_CONTENT_LENGTH"] = MAX_ATTACHMENT_BYTES
 
 _lock = threading.Lock()
 _state = {
@@ -34,7 +51,49 @@ def _default_config() -> dict:
         "people_names": [],
         "message_template": "Hi {name},\n\n",
         "attachment_path": None,
+        "attachment_name": None,
     }
+
+
+def _safe_attachment_name(filename: str) -> str:
+    name = Path(filename or "").name.replace("\x00", "")
+    name = re.sub(r"[\\/]+", "_", name).strip(" .")
+    if not name or name in {".", ".."}:
+        return "attachment"
+    return name[:180]
+
+
+def _is_managed_attachment(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+        root = ATTACHMENTS_DIR.resolve()
+        if hasattr(resolved, "is_relative_to"):
+            return resolved.is_relative_to(root)
+        return os.path.commonpath([str(resolved), str(root)]) == str(root)
+    except (OSError, ValueError):
+        return False
+
+
+def _remove_managed_attachment(path_str: str | None) -> None:
+    if not path_str:
+        return
+    path = Path(path_str)
+    if not _is_managed_attachment(path):
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _attachment_fields(path_str, name: str | None) -> tuple[str | None, str | None]:
+    if not isinstance(path_str, str) or not path_str.strip():
+        return None, None
+    path = Path(path_str)
+    if not path.is_file():
+        return None, None
+    display = name.strip() if isinstance(name, str) and name.strip() else path.name
+    return str(path), display
 
 
 def read_config() -> dict:
@@ -47,10 +106,15 @@ def read_config() -> dict:
     names = data.get("people_names") or []
     if isinstance(names, str):
         names = [n.strip() for n in names.splitlines() if n.strip()]
+    attachment_path, attachment_name = _attachment_fields(
+        data.get("attachment_path"),
+        data.get("attachment_name"),
+    )
     return {
         "people_names": [n for n in names if isinstance(n, str) and n.strip()],
         "message_template": data.get("message_template") or "",
-        "attachment_path": data.get("attachment_path"),
+        "attachment_path": attachment_path,
+        "attachment_name": attachment_name,
     }
 
 
@@ -61,14 +125,16 @@ def write_config(data: dict) -> dict:
     else:
         names = [str(n).strip() for n in names if str(n).strip()]
 
-    attachment = data.get("attachment_path")
-    if isinstance(attachment, str) and not attachment.strip():
-        attachment = None
+    attachment_path, attachment_name = _attachment_fields(
+        data.get("attachment_path"),
+        data.get("attachment_name"),
+    )
 
     payload = {
         "people_names": names,
         "message_template": (data.get("message_template") or "").replace("\r\n", "\n"),
-        "attachment_path": attachment,
+        "attachment_path": attachment_path,
+        "attachment_name": attachment_name,
     }
     CONFIG_PATH.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return payload
@@ -186,6 +252,57 @@ def api_people_template():
         download_name="sendline-people-template.csv",
         mimetype="text/csv; charset=utf-8",
     )
+
+
+@app.errorhandler(413)
+def api_too_large(_err):
+    return jsonify({"ok": False, "error": "That file is too large. Keep attachments under 25 MB."}), 413
+
+
+@app.post("/api/attachment")
+def api_upload_attachment():
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"ok": False, "error": "Choose a file to attach."}), 400
+
+    original_name = _safe_attachment_name(uploaded.filename)
+    ext = Path(original_name).suffix.lower()
+    if ext not in ALLOWED_ATTACHMENT_EXT:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Please attach a PDF, Word, PowerPoint, Excel, or image file.",
+            }
+        ), 400
+
+    ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = ATTACHMENTS_DIR / original_name
+    current = read_config()
+    old_path = current.get("attachment_path")
+    if old_path and Path(old_path).resolve() != dest.resolve():
+        _remove_managed_attachment(old_path)
+
+    uploaded.save(str(dest))
+    current["attachment_path"] = str(dest)
+    current["attachment_name"] = original_name
+    saved = write_config(current)
+    return jsonify(
+        {
+            "ok": True,
+            "attachment_path": saved["attachment_path"],
+            "attachment_name": saved["attachment_name"],
+        }
+    )
+
+
+@app.delete("/api/attachment")
+def api_clear_attachment():
+    current = read_config()
+    _remove_managed_attachment(current.get("attachment_path"))
+    current["attachment_path"] = None
+    current["attachment_name"] = None
+    write_config(current)
+    return jsonify({"ok": True, "attachment_path": None, "attachment_name": None})
 
 
 @app.get("/api/config")
@@ -310,6 +427,7 @@ def api_stop():
 
 if __name__ == "__main__":
     STATIC_DIR.mkdir(exist_ok=True)
+    ATTACHMENTS_DIR.mkdir(exist_ok=True)
     if not CONFIG_PATH.exists():
         write_config(_default_config())
     print("Sendline UI -> http://127.0.0.1:5055")
