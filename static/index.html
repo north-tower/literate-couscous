@@ -22,12 +22,22 @@
 
     <section class="workspace" aria-label="Campaign controls">
       <div class="panel">
-        <div class="field">
+        <div class="field" id="namesField">
           <div class="field-head">
             <label for="names">People</label>
-            <span class="meta" id="nameCount">0</span>
+            <div class="field-tools">
+              <button type="button" class="text-btn" id="uploadNamesBtn">Upload .txt / .csv</button>
+              <span class="meta" id="nameCount">0</span>
+            </div>
           </div>
-          <textarea id="names" spellcheck="false" placeholder="One full name per line"></textarea>
+          <input type="file" id="namesFile" accept=".txt,.csv,text/plain,text/csv" hidden />
+          <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload a .txt / .csv"></textarea>
+          <div class="upload-progress" id="uploadProgress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" id="uploadProgressFill"></div>
+            </div>
+            <span class="progress-label" id="uploadProgressLabel">0%</span>
+          </div>
         </div>
 
         <div class="field">
