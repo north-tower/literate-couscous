@@ -57,3 +57,4 @@ chrome_profile/
 # Worker debug artifacts
 login_debug.png
 *.log
+sendline.stop

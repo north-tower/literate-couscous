@@ -14,6 +14,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "run_config.json"
+STOP_FLAG = ROOT / "sendline.stop"
 STATIC_DIR = ROOT / "static"
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
@@ -99,6 +100,45 @@ def _worker_python() -> str:
         except Exception:
             continue
     return sys.executable
+
+
+def _clear_stop_flag() -> None:
+    try:
+        STOP_FLAG.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _kill_chrome() -> None:
+    if os.name != "nt":
+        return
+    subprocess.run(
+        ["taskkill", "/F", "/IM", "chrome.exe", "/T"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _force_stop_if_needed(proc: subprocess.Popen) -> None:
+    """If the worker ignores the stop flag, kill it and close Chrome."""
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return
+        time.sleep(0.3)
+    _append_log("[sendline] worker did not stop in time — forcing exit and closing Chrome")
+    try:
+        proc.terminate()
+    except Exception:
+        pass
+    time.sleep(1.5)
+    if proc.poll() is None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    _kill_chrome()
 
 
 def _append_log(line: str) -> None:
@@ -203,6 +243,7 @@ def api_run():
         _state["exit_code"] = None
         _state["log_lines"] = []
 
+    _clear_stop_flag()
     _append_log(f"[sendline] launching worker for {len(saved['people_names'])} people...")
 
     python = _worker_python()
@@ -248,8 +289,9 @@ def api_stop():
     if not running or proc is None:
         return jsonify({"ok": False, "error": "Nothing is running."}), 400
     try:
-        proc.terminate()
-        _append_log("[sendline] stop requested")
+        STOP_FLAG.write_text("stop\n", encoding="utf-8")
+        _append_log("[sendline] stop requested — worker will close Chrome")
+        threading.Thread(target=_force_stop_if_needed, args=(proc,), daemon=True).start()
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
     return jsonify({"ok": True})

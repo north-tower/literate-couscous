@@ -74,6 +74,7 @@ async function saveConfig(quiet = false) {
 function setRunningUi(running) {
   runBtn.disabled = running;
   stopBtn.hidden = !running;
+  if (!running) stopBtn.disabled = false;
   if (running) pulseEl.dataset.state = "running";
 }
 
@@ -98,9 +99,9 @@ async function pollLogs() {
       if (code === 0) {
         pulseEl.dataset.state = "done";
         setStatus("Worker finished successfully", "ok");
-      } else if (code == null) {
+      } else if (code == null || code === 130) {
         pulseEl.dataset.state = "done";
-        setStatus("Worker stopped", "ok");
+        setStatus("Worker stopped — Chrome closed", "ok");
       } else {
         pulseEl.dataset.state = "error";
         setStatus(`Worker failed (exit ${code}). Check the live log.`, "error");
@@ -148,14 +149,17 @@ async function launch() {
 
 async function stop() {
   try {
+    stopBtn.disabled = true;
     const res = await fetch("/api/stop", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      stopBtn.disabled = false;
       setStatus(data.error || "Stop failed", "error");
       return;
     }
-    setStatus("Stop requested", "ok");
+    setStatus("Stopping — closing Chrome…", "ok");
   } catch (_) {
+    stopBtn.disabled = false;
     setStatus("Cannot reach Sendline server", "error");
   }
 }

@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Iterable, Optional
@@ -151,16 +152,66 @@ SELECTORS = {
 }
 
 # =========================
+# Stop / shutdown
+# =========================
+STOP_FLAG = Path(__file__).resolve().parent / "sendline.stop"
+
+
+class StopRequested(Exception):
+    """User clicked Stop in the UI (or Ctrl+C)."""
+
+
+def clear_stop_flag() -> None:
+    try:
+        STOP_FLAG.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def should_stop() -> bool:
+    return STOP_FLAG.is_file()
+
+
+def interruptible_sleep(seconds: float) -> None:
+    deadline = time.time() + seconds
+    while True:
+        if should_stop():
+            raise StopRequested()
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return
+        time.sleep(min(0.2, remaining))
+
+
+def shutdown_browser() -> None:
+    global driver
+    print("Closing Chrome...")
+    _kill_chrome()
+    try:
+        if driver is not None:
+            driver.quit()
+    except Exception:
+        pass
+    driver = None
+    print("Chrome closed.")
+
+
+# =========================
 # Helpers
 # =========================
 def wait_for_any(driver: webdriver.Chrome, choices: Iterable[tuple[str, str]], cond, timeout: Optional[int] = None):
     timeout = timeout or TIMEOUTS["ui"]
     last_exc = None
     for by, sel in choices:
-        try:
-            return WebDriverWait(driver, timeout).until(cond((by, sel)))
-        except TimeoutException as e:
-            last_exc = e
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if should_stop():
+                raise StopRequested()
+            slice_timeout = min(1.0, max(0.05, deadline - time.time()))
+            try:
+                return WebDriverWait(driver, slice_timeout).until(cond((by, sel)))
+            except TimeoutException as e:
+                last_exc = e
     if last_exc:
         raise last_exc
     raise TimeoutException("wait_for_any: no selectors provided")
@@ -185,12 +236,12 @@ def paste_message_via_clipboard(driver, el, text: str) -> bool:
     # Move focus & click editor
     scroll_into_view(driver, el)
     click_js(driver, el)
-    time.sleep(0.1)
+    interruptible_sleep(0.1)
 
     # Send Ctrl+V (real paste)
     actions = ActionChains(driver)
     actions.move_to_element(el).click(el).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-    time.sleep(SLEEPS["after_paste"])
+    interruptible_sleep(SLEEPS["after_paste"])
 
     # Nudge with a real keystroke so frameworks flip state
     try:
@@ -212,7 +263,7 @@ def fallback_type_like_human(driver, el, text: str):
         if chunk:
             actions.send_keys(chunk).perform()
         actions.key_down(Keys.SHIFT).send_keys(Keys.ENTER).key_up(Keys.SHIFT).perform()  # newline without sending
-        time.sleep(0.05)  # tiny delay
+        interruptible_sleep(0.05)
 
 # =========================
 # Browser setup — copy Mike profile into a dedicated automation folder.
@@ -514,7 +565,7 @@ def _is_logged_in(timeout: int = 5) -> bool:
                 return True
         except TimeoutException:
             pass
-        time.sleep(0.5)
+        interruptible_sleep(0.5)
     return False
 
 
@@ -525,10 +576,12 @@ def _wait_for_manual_login(timeout: int = 300) -> None:
     )
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if should_stop():
+            raise StopRequested()
         if _is_logged_in(2):
             print("Logged in to LinkedIn.")
             return
-        time.sleep(2)
+        interruptible_sleep(2)
     _dump_login_debug("Manual login timed out")
     raise TimeoutException("Manual LinkedIn login timed out.")
 
@@ -538,7 +591,7 @@ def login_to_linkedin(email: str, password: str) -> None:
     # Keep this automation profile logged in after one manual sign-in.
     print("Opening LinkedIn feed…")
     driver.get("https://www.linkedin.com/feed/")
-    time.sleep(4)
+    interruptible_sleep(4)
     if _is_logged_in(15):
         print("Already logged in — continuing.")
         return
@@ -546,16 +599,18 @@ def login_to_linkedin(email: str, password: str) -> None:
     print("LinkedIn session not active in the automation profile.")
     print("Sign in once in the opened Chrome window; later runs will reuse it.")
     driver.get("https://www.linkedin.com/login")
-    time.sleep(2)
+    interruptible_sleep(2)
     _wait_for_manual_login(300)
 
 # =========================
 # New message flow
 # =========================
 def start_new_chat_and_send_message(person_name: str, message: str, attachment_path: Optional[str]) -> None:
+    if should_stop():
+        raise StopRequested()
     driver.get("https://www.linkedin.com/messaging/thread/new/")
     print("Opening new message window...")
-    time.sleep(SLEEPS["pre_message_page"])
+    interruptible_sleep(SLEEPS["pre_message_page"])
 
     # Select recipient via Enter (top suggestion)
     try:
@@ -563,9 +618,9 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         search_bar.send_keys(Keys.CONTROL, "a")
         search_bar.send_keys(Keys.DELETE)
         search_bar.send_keys(person_name)
-        time.sleep(SLEEPS["after_name_type"])
+        interruptible_sleep(SLEEPS["after_name_type"])
         search_bar.send_keys(Keys.ENTER)
-        time.sleep(SLEEPS["after_enter"])
+        interruptible_sleep(SLEEPS["after_enter"])
         try:
             wait_for_any(driver, SELECTORS["recipient_chip_any"], EC.presence_of_element_located, 3)
             print(f"Selected {person_name}.")
@@ -580,7 +635,7 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         message_box = wait_for_any(driver, SELECTORS["editor"], EC.visibility_of_element_located, TIMEOUTS["ui"])
         scroll_into_view(driver, message_box)
         click_js(driver, message_box)
-        time.sleep(SLEEPS["after_click_editor"])
+        interruptible_sleep(SLEEPS["after_click_editor"])
 
         # Paste message via OS clipboard -> Ctrl+V. If that fails, type like a human.
         if not paste_message_via_clipboard(driver, message_box, message):
@@ -602,7 +657,7 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
             file_input = wait_for_any(driver, SELECTORS["file_input"], EC.presence_of_element_located, TIMEOUTS["short"])
             file_input.send_keys(str(Path(attachment_path)))
             print("File attached.")
-            time.sleep(SLEEPS["after_attach"])
+            interruptible_sleep(SLEEPS["after_attach"])
         else:
             print("No attachment path provided; sending text only.")
 
@@ -611,7 +666,7 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         scroll_into_view(driver, send_button)
         click_js(driver, send_button)
         print(f"Message and attachment (if any) sent to {person_name}.")
-        time.sleep(SLEEPS["after_send"])
+        interruptible_sleep(SLEEPS["after_send"])
 
     except (TimeoutException, NoSuchElementException, ElementClickInterceptedException) as e:
         print(f"Failed to send the message to {person_name}: {e}")
@@ -622,13 +677,27 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
 # Run
 # =========================
 if __name__ == "__main__":
-    run_names, run_template, run_attachment = load_run_config()
-    driver = start_or_attach_chrome()
-    login_to_linkedin(EMAIL, PASSWORD)
+    clear_stop_flag()
+    stopped = False
+    try:
+        run_names, run_template, run_attachment = load_run_config()
+        driver = start_or_attach_chrome()
+        login_to_linkedin(EMAIL, PASSWORD)
 
-    for full_name in run_names:
-        first_name = full_name.split()[0]
-        msg = run_template.format(name=first_name)
-        start_new_chat_and_send_message(full_name, msg, run_attachment)
-
-    driver.quit()
+        for full_name in run_names:
+            if should_stop():
+                raise StopRequested()
+            first_name = full_name.split()[0]
+            msg = run_template.format(name=first_name)
+            start_new_chat_and_send_message(full_name, msg, run_attachment)
+    except StopRequested:
+        print("Stop requested — closing Chrome.")
+        stopped = True
+    except KeyboardInterrupt:
+        print("Interrupted — closing Chrome.")
+        stopped = True
+    finally:
+        shutdown_browser()
+        clear_stop_flag()
+    if stopped:
+        sys.exit(130)
