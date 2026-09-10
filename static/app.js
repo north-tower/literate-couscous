@@ -50,7 +50,20 @@ function updateCount() {
 
 function setStatus(text, kind = "") {
   statusEl.textContent = text || "";
-  statusEl.className = "status" + (kind ? ` ${kind}` : "");
+  let visual = kind;
+  if (!visual && text) {
+    const t = text.toLowerCase();
+    if (
+      t.includes("starting") ||
+      t.includes("running") ||
+      t.includes("stopping") ||
+      t.includes("processing") ||
+      t.includes("uploading")
+    ) {
+      visual = "running";
+    }
+  }
+  statusEl.className = "status" + (visual ? ` ${visual}` : "");
 }
 
 function payloadFromForm() {
@@ -426,10 +439,33 @@ function setRunningUi(running) {
   if (running) pulseEl.dataset.state = "running";
 }
 
+function logLineClass(line) {
+  const t = String(line || "").toLowerCase();
+  if (t.includes("[error]") || t.includes("failed") || t.includes("error")) return "log-line log-line--err";
+  if (t.includes("[info]") || t.includes("[warn]")) return "log-line log-line--info";
+  if (
+    t.includes("finished") ||
+    t.includes("successfully") ||
+    t.includes("logged in") ||
+    t.includes("sent to") ||
+    t.includes("chrome closed")
+  ) {
+    return "log-line log-line--ok";
+  }
+  return "log-line";
+}
+
 function appendLogs(lines) {
   if (!lines.length) return;
   const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 24;
-  logEl.textContent += (logEl.textContent ? "\n" : "") + lines.join("\n");
+  const frag = document.createDocumentFragment();
+  for (const line of lines) {
+    const row = document.createElement("span");
+    row.className = logLineClass(line);
+    row.textContent = line + "\n";
+    frag.appendChild(row);
+  }
+  logEl.appendChild(frag);
   if (atBottom) logEl.scrollTop = logEl.scrollHeight;
 }
 
@@ -474,8 +510,8 @@ async function launch() {
       pulseEl.dataset.state = "error";
       return;
     }
-    setStatus("Starting…");
-    logEl.textContent = "";
+    setStatus("Starting…", "running");
+    logEl.replaceChildren();
     logCursor = 0;
     pulseEl.dataset.state = "running";
     setRunningUi(true);
@@ -492,7 +528,7 @@ async function launch() {
       setRunningUi(false);
       return;
     }
-    setStatus(`Running for ${data.count} people — watch Chrome + the live log`, "ok");
+    setStatus(`Running for ${data.count} people — watch Chrome + the live log`, "running");
     startPolling();
   } catch (err) {
     setStatus("Cannot reach Sendline server. Run: py app.py", "error");
@@ -511,7 +547,7 @@ async function stop() {
       setStatus(data.error || "Stop failed", "error");
       return;
     }
-    setStatus("Stopping — closing Chrome…", "ok");
+    setStatus("Stopping — closing Chrome…", "running");
   } catch (_) {
     stopBtn.disabled = false;
     setStatus("Cannot reach Sendline server", "error");
@@ -526,8 +562,10 @@ stopBtn.addEventListener("click", stop);
 togglePasswordBtn.addEventListener("click", () => {
   const show = linkedinPasswordEl.type === "password";
   linkedinPasswordEl.type = show ? "text" : "password";
-  togglePasswordBtn.textContent = show ? "Hide" : "Show";
   togglePasswordBtn.setAttribute("aria-pressed", show ? "true" : "false");
+  togglePasswordBtn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  const label = document.getElementById("togglePasswordText");
+  if (label) label.textContent = show ? "Hide" : "Show";
 });
 
 uploadNamesBtn.addEventListener("click", () => namesFileEl.click());
