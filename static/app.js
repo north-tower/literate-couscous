@@ -16,34 +16,9 @@ const runBtn = document.getElementById("runBtn");
 const stopBtn = document.getElementById("stopBtn");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
-const FULL_NAME_HEADERS = new Set([
-  "name",
-  "full_name",
-  "fullname",
-  "person",
-  "person_name",
-  "people",
-  "contact",
-  "contact_name",
-  "recipient",
-  "candidate",
-]);
-const FIRST_NAME_HEADERS = new Set([
-  "first",
-  "first_name",
-  "firstname",
-  "given",
-  "given_name",
-  "forename",
-]);
-const LAST_NAME_HEADERS = new Set([
-  "last",
-  "last_name",
-  "lastname",
-  "surname",
-  "family",
-  "family_name",
-]);
+const TEMPLATE_NAME_HEADER = "name";
+const TEMPLATE_ERROR =
+  "This file doesn’t match the template. Download the template, keep the name header, and put one full name per row.";
 
 let logCursor = 0;
 let pollTimer = null;
@@ -143,6 +118,16 @@ function looksLikeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function isTemplateNameHeader(value) {
+  return headerKey(value) === TEMPLATE_NAME_HEADER;
+}
+
+function templateError() {
+  const err = new Error(TEMPLATE_ERROR);
+  err.code = "TEMPLATE";
+  return err;
+}
+
 function detectDelimiter(sample) {
   const comma = (sample.match(/,/g) || []).length;
   const semi = (sample.match(/;/g) || []).length;
@@ -182,70 +167,26 @@ function parseDelimitedLine(line, delimiter) {
   return out;
 }
 
-function nameFromCells(cells, getter) {
-  if (getter) return getter(cells);
-  if (!cells.length) return "";
-  if (cells.length === 1) return cells[0];
-  const firstNonEmail = cells.find((c) => c && !looksLikeEmail(c));
-  if (firstNonEmail && firstNonEmail.includes(" ")) return firstNonEmail;
-  if (cells[0] && !looksLikeEmail(cells[0]) && cells[1] && !looksLikeEmail(cells[1])) {
-    return (cells[0] + " " + cells[1]).trim();
-  }
-  return firstNonEmail || cells[0] || "";
-}
-
-function makeCsvNameGetter(headerCells) {
-  const keys = headerCells.map(headerKey);
-  const fullIdx = keys.findIndex((k) => FULL_NAME_HEADERS.has(k));
-  if (fullIdx >= 0) return (cells) => cells[fullIdx] || "";
-  const firstIdx = keys.findIndex((k) => FIRST_NAME_HEADERS.has(k));
-  const lastIdx = keys.findIndex((k) => LAST_NAME_HEADERS.has(k));
-  if (firstIdx >= 0 && lastIdx >= 0) {
-    return (cells) => [cells[firstIdx], cells[lastIdx]].filter(Boolean).join(" ").trim();
-  }
-  if (firstIdx >= 0) return (cells) => cells[firstIdx] || "";
-  return null;
-}
-
-function looksLikeHeaderRow(cells) {
-  const keys = cells.map(headerKey).filter(Boolean);
-  if (!keys.length) return false;
-  return keys.some(
-    (k) =>
-      FULL_NAME_HEADERS.has(k) ||
-      FIRST_NAME_HEADERS.has(k) ||
-      LAST_NAME_HEADERS.has(k) ||
-      k === "email" ||
-      k === "company" ||
-      k === "title"
-  );
-}
-
-function fileKind(file) {
-  const name = (file.name || "").toLowerCase();
-  if (name.endsWith(".csv")) return "csv";
-  if (name.endsWith(".txt")) return "txt";
-  const type = (file.type || "").toLowerCase();
-  if (type.includes("csv")) return "csv";
-  if (type.includes("text")) return "txt";
-  return "";
-}
-
 async function extractNamesFromText(text, kind, onProgress) {
   const cleaned = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = cleaned.split("\n");
   const names = [];
   const seen = new Set();
   let delimiter = ",";
-  let getter = null;
+  let nameIndex = 0;
   let start = 0;
 
   if (kind === "csv") {
     const firstData = lines.find((line) => line.trim());
-    delimiter = detectDelimiter(firstData || "");
-    const headerCells = parseDelimitedLine(firstData || "", delimiter);
-    if (looksLikeHeaderRow(headerCells)) {
-      getter = makeCsvNameGetter(headerCells);
+    if (!firstData) throw templateError();
+    delimiter = detectDelimiter(firstData);
+    const headerCells = parseDelimitedLine(firstData, delimiter);
+    nameIndex = headerCells.findIndex(isTemplateNameHeader);
+    if (nameIndex < 0) throw templateError();
+    start = lines.indexOf(firstData) + 1;
+  } else if (kind === "txt") {
+    const firstData = lines.find((line) => line.trim());
+    if (firstData && isTemplateNameHeader(firstData.trim())) {
       start = lines.indexOf(firstData) + 1;
     }
   }
@@ -258,13 +199,13 @@ async function extractNamesFromText(text, kind, onProgress) {
       if (!raw || !raw.trim()) continue;
       let name = "";
       if (kind === "csv") {
-        name = nameFromCells(parseDelimitedLine(raw, delimiter), getter);
+        const cells = parseDelimitedLine(raw, delimiter);
+        name = cells[nameIndex] || "";
       } else {
         name = raw.trim();
-        if (j === start && looksLikeHeaderRow([name])) continue;
       }
       name = name.replace(/\s+/g, " ").trim();
-      if (!name || looksLikeEmail(name)) continue;
+      if (!name || looksLikeEmail(name) || isTemplateNameHeader(name)) continue;
       const key = name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -274,6 +215,16 @@ async function extractNamesFromText(text, kind, onProgress) {
     await onProgress(pct, "Processing names…");
   }
   return names;
+}
+
+function fileKind(file) {
+  const name = (file.name || "").toLowerCase();
+  if (name.endsWith(".csv")) return "csv";
+  if (name.endsWith(".txt")) return "txt";
+  const type = (file.type || "").toLowerCase();
+  if (type.includes("csv")) return "csv";
+  if (type.includes("text")) return "txt";
+  return "";
 }
 
 async function importNamesFile(file) {
@@ -314,7 +265,12 @@ async function importNamesFile(file) {
 
     if (!names.length) {
       hideUploadProgress();
-      setStatus("No names found in that file. Use one name per line, or a Name column in the CSV.", "error");
+      setStatus(
+        kind === "csv"
+          ? "The name column is empty. Add people to the template, then upload."
+          : "No names found. Add one full name per line, or use the CSV template.",
+        "error"
+      );
       return;
     }
 
@@ -327,7 +283,7 @@ async function importNamesFile(file) {
     saveConfig(true);
   } catch (err) {
     hideUploadProgress();
-    setStatus("Could not read that file. Try a .txt or .csv export.", "error");
+    setStatus(err && err.code === "TEMPLATE" ? TEMPLATE_ERROR : "Could not read that file. Download the template and upload the filled CSV.", "error");
   } finally {
     namesImporting = false;
     uploadNamesBtn.disabled = false;
@@ -462,7 +418,7 @@ namesField.addEventListener("drop", (event) => {
   const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
   if (!file) return;
   if (!isNamesFile(file)) {
-    setStatus("Please drop a .txt or .csv file.", "error");
+    setStatus("Please drop the filled template (.csv) or a .txt list.", "error");
     return;
   }
   importNamesFile(file);

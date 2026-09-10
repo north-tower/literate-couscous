@@ -177,6 +177,17 @@ def index():
     return send_from_directory(STATIC_DIR, "index.html")
 
 
+@app.get("/api/people-template")
+def api_people_template():
+    return send_from_directory(
+        STATIC_DIR,
+        "people_template.csv",
+        as_attachment=True,
+        download_name="sendline-people-template.csv",
+        mimetype="text/csv; charset=utf-8",
+    )
+
+
 @app.get("/api/config")
 def api_get_config():
     return jsonify(read_config())

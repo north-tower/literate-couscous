@@ -26,12 +26,14 @@
           <div class="field-head">
             <label for="names">People</label>
             <div class="field-tools">
-              <button type="button" class="text-btn" id="uploadNamesBtn">Upload .txt / .csv</button>
+              <a class="text-btn" href="/api/people-template" download="sendline-people-template.csv">Download template</a>
+              <button type="button" class="text-btn" id="uploadNamesBtn">Upload file</button>
               <span class="meta" id="nameCount">0</span>
             </div>
           </div>
           <input type="file" id="namesFile" accept=".txt,.csv,text/plain,text/csv" hidden />
-          <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload a .txt / .csv"></textarea>
+          <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload the template"></textarea>
+          <p class="field-hint">Download the CSV template, replace the example names (one full name per row), then upload.</p>
           <div class="upload-progress" id="uploadProgress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="progress-track" aria-hidden="true">
               <div class="progress-fill" id="uploadProgressFill"></div>

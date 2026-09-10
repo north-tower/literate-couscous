@@ -149,6 +149,8 @@ body {
 .field-tools {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.85rem;
 }
 
@@ -164,10 +166,21 @@ body {
   text-underline-offset: 3px;
 }
 
+a.text-btn {
+  color: var(--accent-deep);
+}
+
 .text-btn:hover { color: var(--accent); }
 .text-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
 }
 
 .field.drop-ready textarea {
