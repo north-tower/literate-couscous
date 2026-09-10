@@ -22,6 +22,7 @@
 
     <section class="workspace" aria-label="Campaign controls">
       <div class="panel">
+        <div class="panel-scroll">
         <div class="card" id="linkedinField">
           <div class="field-head">
             <span class="field-label">LinkedIn credentials</span>
@@ -61,7 +62,7 @@
             <div class="field-tools">
               <a class="text-btn" href="/api/people-template" download="sendline-people-template.csv">Download template</a>
               <button type="button" class="text-btn" id="uploadNamesBtn">Upload file</button>
-              <span class="meta count-pill" id="nameCount">0</span>
+              <span class="meta count-pill" id="nameCount" title="0 people loaded">0 people</span>
             </div>
           </div>
           <input type="file" id="namesFile" accept=".txt,.csv,text/plain,text/csv" hidden />
@@ -101,6 +102,7 @@
             </div>
             <span class="progress-label" id="attachmentProgressLabel">0%</span>
           </div>
+        </div>
         </div>
 
         <div class="actions-card">

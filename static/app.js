@@ -36,6 +36,13 @@ let namesImporting = false;
 let attachmentPath = null;
 let attachmentName = null;
 let attachmentUploading = false;
+let stopRequested = false;
+
+const STATUS_ICONS = {
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>',
+  stopped: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5"/><path d="M12 16.5h.01"/><path d="M12 3.5L21 19H3L12 3.5z"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
+};
 
 function parseNames(text) {
   return text
@@ -45,11 +52,13 @@ function parseNames(text) {
 }
 
 function updateCount() {
-  nameCountEl.textContent = String(parseNames(namesEl.value).length);
+  const n = parseNames(namesEl.value).length;
+  const label = n === 1 ? "1 person" : n + " people";
+  nameCountEl.textContent = label;
+  nameCountEl.title = n === 1 ? "1 person loaded" : n + " people loaded";
 }
 
 function setStatus(text, kind = "") {
-  statusEl.textContent = text || "";
   let visual = kind;
   if (!visual && text) {
     const t = text.toLowerCase();
@@ -64,6 +73,19 @@ function setStatus(text, kind = "") {
     }
   }
   statusEl.className = "status" + (visual ? ` ${visual}` : "");
+  statusEl.replaceChildren();
+  if (!text) return;
+  if (visual === "ok" || visual === "stopped" || visual === "error") {
+    const icon = document.createElement("span");
+    icon.className = "status-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = STATUS_ICONS[visual];
+    const label = document.createElement("span");
+    label.textContent = text;
+    statusEl.append(icon, label);
+    return;
+  }
+  statusEl.textContent = text;
 }
 
 function payloadFromForm() {
@@ -440,18 +462,19 @@ function setRunningUi(running) {
 }
 
 function logLineClass(line) {
-  const t = String(line || "").toLowerCase();
-  if (t.includes("[error]") || t.includes("failed") || t.includes("error")) return "log-line log-line--err";
-  if (t.includes("[info]") || t.includes("[warn]")) return "log-line log-line--info";
+  const raw = String(line || "");
+  const t = raw.toLowerCase();
   if (
-    t.includes("finished") ||
-    t.includes("successfully") ||
-    t.includes("logged in") ||
-    t.includes("sent to") ||
-    t.includes("chrome closed")
+    t.includes("stop requested") ||
+    t.includes("forcing exit") ||
+    t.includes("did not stop in time") ||
+    t.includes("exit 1")
   ) {
-    return "log-line log-line--ok";
+    return "log-line log-line--warn";
   }
+  if (t.includes("error") || t.includes("failed")) return "log-line log-line--err";
+  if (t.includes("worker finished (exit 0)") || t.includes("successfully")) return "log-line log-line--ok";
+  if (t.includes("[info]")) return "log-line log-line--info";
   return "log-line";
 }
 
@@ -483,13 +506,14 @@ async function pollLogs() {
       if (code === 0) {
         pulseEl.dataset.state = "done";
         setStatus("Worker finished successfully", "ok");
-      } else if (code == null || code === 130) {
-        pulseEl.dataset.state = "done";
-        setStatus("Worker stopped — Chrome closed", "ok");
+      } else if (stopRequested || code === 1 || code === 130) {
+        pulseEl.dataset.state = "stopped";
+        setStatus("Worker stopped — Chrome was force-closed", "stopped");
       } else {
         pulseEl.dataset.state = "error";
-        setStatus(`Worker failed (exit ${code}). Check the live log.`, "error");
+        setStatus("Worker failed — check the log", "error");
       }
+      stopRequested = false;
     }
   } catch (_) {
     setStatus("Lost connection to Sendline server", "error");
@@ -513,6 +537,7 @@ async function launch() {
     setStatus("Starting…", "running");
     logEl.replaceChildren();
     logCursor = 0;
+    stopRequested = false;
     pulseEl.dataset.state = "running";
     setRunningUi(true);
 
@@ -548,6 +573,7 @@ async function stop() {
       return;
     }
     setStatus("Stopping — closing Chrome…", "running");
+    stopRequested = true;
   } catch (_) {
     stopBtn.disabled = false;
     setStatus("Cannot reach Sendline server", "error");

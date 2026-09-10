@@ -26,7 +26,7 @@
 
 html, body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
   color: var(--ink);
   font-family: var(--font-body);
   background:
@@ -37,7 +37,7 @@ html, body {
 
 body {
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .noise {
@@ -90,10 +90,13 @@ body {
   position: relative;
   z-index: 1;
   width: min(1180px, calc(100% - 2rem));
+  height: 100vh;
   margin: 0 auto;
-  padding: 1.35rem 0 2rem;
+  padding: 1.1rem 0 1.1rem;
   display: grid;
-  gap: 1.15rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.9rem;
+  overflow: hidden;
 }
 
 .brand {
@@ -125,7 +128,8 @@ body {
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
   gap: 1rem;
   align-items: stretch;
-  min-height: calc(100vh - 6.5rem);
+  min-height: 0;
+  height: 100%;
 }
 
 .panel {
@@ -133,6 +137,19 @@ body {
   flex-direction: column;
   gap: 0.85rem;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-right: 2px;
 }
 
 .card,
@@ -205,13 +222,14 @@ body {
 .meta.tip { opacity: 0.85; }
 
 .count-pill {
-  min-width: 1.6rem;
-  padding: 0.15rem 0.45rem;
+  min-width: auto;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-deep);
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
 }
 
 .field-hint {
@@ -415,6 +433,11 @@ input:disabled {
 .icon-btn[aria-pressed="true"] .icon-eye { display: none; }
 .icon-btn[aria-pressed="true"] .icon-eye-off { display: block; }
 
+#names,
+#message {
+  background: #eef1ef;
+}
+
 #names {
   min-height: 168px;
   resize: vertical;
@@ -426,6 +449,11 @@ input:disabled {
 #message {
   min-height: 140px;
   resize: vertical;
+}
+
+#names:focus,
+#message:focus {
+  background: #f7f8f7;
 }
 
 .attach-row {
@@ -451,7 +479,9 @@ input:disabled {
 }
 
 .actions-card {
-  margin-top: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
+  z-index: 2;
 }
 
 .actions {
@@ -525,19 +555,29 @@ input:disabled {
   display: flex;
 }
 
-.status::before {
-  content: "";
-  flex: 0 0 0.55rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-top: 0.35rem;
-  border-radius: 50%;
-  background: currentColor;
+.status-icon {
+  flex: 0 0 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.08rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .status.ok {
   color: var(--accent-deep);
   background: var(--ok-soft);
+}
+
+.status.stopped {
+  color: #9a4d0a;
+  background: var(--warn-soft);
 }
 
 .status.error {
@@ -553,7 +593,8 @@ input:disabled {
 .log-panel {
   display: grid;
   grid-template-rows: auto 1fr;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
   background: var(--console);
   border: 1px solid #1c2a24;
@@ -614,6 +655,7 @@ input:disabled {
 }
 
 .pulse[data-state="done"] { background: #5ee0b5; }
+.pulse[data-state="stopped"] { background: #e0b15a; }
 .pulse[data-state="error"] { background: #f0a07a; }
 
 @keyframes beat {
@@ -625,14 +667,14 @@ input:disabled {
 .log {
   margin: 0;
   padding: 0.9rem 1rem 1.15rem;
-  overflow: auto;
-  min-height: 280px;
-  max-height: none;
+  overflow-y: auto;
+  min-height: 0;
   height: 100%;
+  max-height: none;
   font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   font-size: 0.75rem;
   line-height: 1.65;
-  color: #9aada4;
+  color: #7d9a92;
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--console);
@@ -640,25 +682,50 @@ input:disabled {
 
 .log-line {
   display: block;
-  color: #8b9d94;
+  color: #7d9a92;
 }
 
 .log-line--info { color: #e0b15a; }
 .log-line--ok { color: #7dccb0; }
-.log-line--err { color: #f0a07a; }
+.log-line--err { color: #ef7a6a; }
+.log-line--warn { color: #e89a4a; }
 
 @media (max-width: 880px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  .stage {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    grid-template-rows: auto auto;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
+    height: auto;
     min-height: 0;
   }
 
-  .log-panel {
-    min-height: 280px;
+  .panel {
+    height: auto;
+    overflow: visible;
   }
 
-  .log {
-    max-height: 50vh;
+  .panel-scroll {
+    overflow: visible;
+  }
+
+  .actions-card {
+    position: sticky;
+    bottom: 0;
+  }
+
+  .log-panel {
+    height: min(50vh, 420px);
+    min-height: 280px;
   }
 
   .actions {
