@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import json
 import os
 import socket
@@ -23,76 +24,11 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
 )
 
-# =========================
-# YOUR SETTINGS (Hardcoded fallbacks — UI config overrides these)
-# =========================
-EMAIL = ""
-PASSWORD = ""
-people_names = [
-    "Paul Rees",
-    "Jose Delgado",
-    "Pawel Babut",
-    "Peter Shaw",
-    "Simona Bodis",
-    "Andy Sowden",
-    "Mark Gregory",
-    "Sally Walker",
-    "Ertan Ates",
-    "Sharon White",
-    "Sarah Upson",
-    "Tim Roberts",
-    "Jenny Pollard",
-    "Chetan Ojha",
-    "Becky Kernsworth",
-    "Lisa Smith",
-    "Kevin Caulfield",
-    "Muhammad Qureshi",
-    "Wendy Holt",
-    "Rebecca Owen",
-    "ARJUNAN C",
-    "Keith Martin",
-    "Millie Jones",
-    "Emma Mitchell",
-    "Jim Wheeler",
-    "Stephen Percival",
-    "Tabitha Atkinson",
-    "Darya Tsybulko",
-    "Rachel Hughes",
-    "cindy kong",
-    "Vijay Mohan",
-    "Saeed Anjum",
-    "Faisal A Farooqui",
-    "Nicklas Folk",
-    "Christopher Farley",
-    "Julian Thomas",
-    "John Pinnington",
-    "Robert Ayres",
-    "Alex W.H. Hsiao",
-    "Patrick Killeen",
-    "Gianluca Santori",
-    "Umair Iqbal",
-    "Kelly Chan",
-    "Ruth Scholey-Jones",
-    "Stoffer Dunnik",
-    "Jie (Lisa) Li, CFA",
-    "Divya Deep Sharma",
-    "Mark Mitchell",
-    "Andrew Wilson"
-]
-
-
-ATTACHMENT_PATH = None #r"C:\Users\prathamesh.khatavkar\Downloads\INNOOOVA Retail Deck.pdf"  # set to None for text-only
-
-MESSAGE_TEMPLATE = """Hi {name},
-
-We’re hiring an experienced IT Project Manager for an exciting global role within global logistics. This is a fully remote position, working closely with Product, Engineering and QA in an Agile environment to translate business needs into clear, delivery-ready requirements.
-
-Strong analysis, documentation and stakeholder communication skills are essential. Experience with integrations, data flows or APIs is a plus.
-
-If this sounds like you, drop me a message.
-
-Ed
-"""
+JOB_DIR: Path | None = None
+USER_DATA_DIR: Path | None = None
+DEBUG_HOST = "127.0.0.1"
+DEBUG_PORT = 9222
+_chrome_proc: subprocess.Popen | None = None
 
 # =========================
 # CONFIG (selectors, waits)
@@ -174,22 +110,25 @@ SELECTORS = {
 # =========================
 # Stop / shutdown
 # =========================
-STOP_FLAG = Path(__file__).resolve().parent / "sendline.stop"
-
-
 class StopRequested(Exception):
     """User clicked Stop in the UI (or Ctrl+C)."""
 
 
+def _stop_flag() -> Path:
+    if JOB_DIR is not None:
+        return JOB_DIR / "stop"
+    return Path(__file__).resolve().parent / "sendline.stop"
+
+
 def clear_stop_flag() -> None:
     try:
-        STOP_FLAG.unlink(missing_ok=True)
+        _stop_flag().unlink(missing_ok=True)
     except OSError:
         pass
 
 
 def should_stop() -> bool:
-    return STOP_FLAG.is_file()
+    return _stop_flag().is_file()
 
 
 def interruptible_sleep(seconds: float) -> None:
@@ -206,13 +145,14 @@ def interruptible_sleep(seconds: float) -> None:
 def shutdown_browser() -> None:
     global driver
     print("Closing Chrome...")
-    _kill_chrome()
+    _kill_job_chrome()
     try:
         if driver is not None:
             driver.quit()
     except Exception:
         pass
     driver = None
+    _kill_job_chrome()
     print("Chrome closed.")
 
 
@@ -362,21 +302,18 @@ def fallback_type_like_human(driver, el, text: str):
         interruptible_sleep(0.05)
 
 # =========================
-# Browser setup — copy Mike profile into a dedicated automation folder.
-# Using the live Chrome "User Data" dir with a debug port often opens
-# about:blank and never exposes port 9222. A copied profile works reliably.
+# Browser setup — per-user --user-data-dir. Never taskkill all Chrome.
 # =========================
-CHROME_USER_DATA = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
-CHROME_PROFILE = "Profile 7"  # display name: Mike (muneshmyk@gmail.com)
-AUTOMATION_USER_DATA = Path(__file__).resolve().parent / "chrome_automation_data"
-DEBUG_HOST = "127.0.0.1"
-DEBUG_PORT = 9222
+def _automation_user_data() -> Path:
+    if USER_DATA_DIR is not None:
+        return USER_DATA_DIR
+    return Path(__file__).resolve().parent / "data" / "chrome_fallback"
 
 
-# Set True only when you want to re-copy from Mike's Chrome profile.
-# After you log into LinkedIn once in the automation window, leave this False
-# so that session is kept (re-copying often drops the LinkedIn login).
-RESYNC_FROM_MIKE_EACH_RUN = False
+def _pid_file() -> Path | None:
+    if JOB_DIR is None:
+        return None
+    return JOB_DIR / "chrome.pid"
 
 
 def _find_chrome_exe() -> Path:
@@ -402,20 +339,89 @@ def _port_open(host: str, port: int) -> bool:
 def _wait_for_port(host: str, port: int, timeout: float = 45) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if should_stop():
+            raise StopRequested()
         if _port_open(host, port):
             return
         time.sleep(0.4)
     raise TimeoutException(f"Chrome debug port {host}:{port} did not open in time.")
 
 
-def _kill_chrome() -> None:
-    subprocess.run(
-        ["taskkill", "/F", "/IM", "chrome.exe", "/T"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    time.sleep(2)
+def _pids_listening_on(port: int) -> list[int]:
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return []
+    pids: list[int] = []
+    needle = f":{port}"
+    for line in (result.stdout or "").splitlines():
+        if "LISTEN" not in line.upper():
+            continue
+        if needle not in line:
+            continue
+        parts = line.split()
+        if not parts:
+            continue
+        try:
+            pid = int(parts[-1])
+        except ValueError:
+            continue
+        if pid and pid not in pids:
+            pids.append(pid)
+    return pids
+
+
+def _kill_pid_tree(pid: int | None) -> None:
+    if not pid:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/F", "/PID", str(pid), "/T"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return
+    try:
+        os.kill(int(pid), 15)
+    except OSError:
+        pass
+
+
+def _read_chrome_pid() -> int | None:
+    path = _pid_file()
+    if path is None or not path.is_file():
+        return None
+    try:
+        pid = int(path.read_text(encoding="utf-8").strip())
+        return pid if pid > 0 else None
+    except (OSError, ValueError):
+        return None
+
+
+def _write_chrome_pid(pid: int | None) -> None:
+    path = _pid_file()
+    if path is None or not pid:
+        return
+    path.write_text(str(int(pid)) + "\n", encoding="utf-8")
+
+
+def _kill_job_chrome() -> None:
+    global _chrome_proc
+    pid = _read_chrome_pid()
+    if _chrome_proc is not None and _chrome_proc.poll() is None:
+        pid = pid or _chrome_proc.pid
+    _kill_pid_tree(pid)
+    for listener in _pids_listening_on(DEBUG_PORT):
+        if listener != pid:
+            _kill_pid_tree(listener)
+    _chrome_proc = None
+    time.sleep(1)
 
 
 def _clear_profile_locks(folder: Path) -> None:
@@ -428,134 +434,36 @@ def _clear_profile_locks(folder: Path) -> None:
             pass
 
 
-def _list_chrome_profiles() -> list[tuple[str, str, str]]:
-    """Return (folder, display_name, email) for profiles under Chrome User Data."""
-    found: list[tuple[str, str, str]] = []
-    local_state = CHROME_USER_DATA / "Local State"
-    info: dict = {}
-    if local_state.is_file():
-        try:
-            info = json.loads(local_state.read_text(encoding="utf-8")).get("profile", {}).get("info_cache", {}) or {}
-        except Exception:
-            info = {}
-
-    folders: list[str] = []
-    if CHROME_USER_DATA.is_dir():
-        for child in sorted(CHROME_USER_DATA.iterdir()):
-            if child.is_dir() and (child.name == "Default" or child.name.startswith("Profile ")):
-                folders.append(child.name)
-    for folder in folders:
-        meta = info.get(folder) or {}
-        display = str(meta.get("name") or "")
-        email = str(meta.get("user_name") or meta.get("gaia_name") or "")
-        found.append((folder, display, email))
-    return found
-
-
-def _print_chrome_profiles() -> None:
-    profiles = _list_chrome_profiles()
-    print(f"Chrome User Data: {CHROME_USER_DATA}")
-    if not profiles:
-        print("  (no Default / Profile * folders found)")
-        return
-    print("Available Chrome profiles on this machine:")
-    for folder, display, email in profiles:
-        label = display or "(no display name)"
-        mail = f" <{email}>" if email else ""
-        mark = "  <- CHROME_PROFILE" if folder == CHROME_PROFILE else ""
-        print(f"  {folder}: {label}{mail}{mark}")
-    print('Set CHROME_PROFILE in worker.py to the Folder name (e.g. "Default" or "Profile 1").')
-
-
-def _ensure_automation_profile_dir() -> None:
-    dst = AUTOMATION_USER_DATA / "Default"
-    AUTOMATION_USER_DATA.mkdir(parents=True, exist_ok=True)
+def _ensure_automation_profile_dir() -> Path:
+    root = _automation_user_data()
+    dst = root / "Default"
+    root.mkdir(parents=True, exist_ok=True)
     dst.mkdir(parents=True, exist_ok=True)
-    _clear_profile_locks(AUTOMATION_USER_DATA)
+    _clear_profile_locks(root)
     _clear_profile_locks(dst)
-
-
-def _sync_source_profile() -> bool:
-    """Copy CHROME_PROFILE into chrome_automation_data/Default. Returns True if synced."""
-    src = CHROME_USER_DATA / CHROME_PROFILE
-    dst = AUTOMATION_USER_DATA / "Default"
-    if not src.is_dir():
-        print(f"[WARN] Source profile not found: {src}")
-        _print_chrome_profiles()
-        return False
-
-    AUTOMATION_USER_DATA.mkdir(parents=True, exist_ok=True)
-    dst.mkdir(parents=True, exist_ok=True)
-    print(f"Syncing Chrome profile '{CHROME_PROFILE}' → {dst}")
-
-    # Exclude bulky/cache dirs; keep cookies + local storage (login session).
-    cmd = [
-        "robocopy",
-        str(src),
-        str(dst),
-        "/E",
-        "/R:1",
-        "/W:1",
-        "/NFL",
-        "/NDL",
-        "/NJH",
-        "/NJS",
-        "/NC",
-        "/NS",
-        "/NP",
-        "/XD",
-        "Cache",
-        "Code Cache",
-        "GPUCache",
-        "GrShaderCache",
-        "ShaderCache",
-        "Service Worker",
-        "/XF",
-        "SingletonLock",
-        "SingletonSocket",
-        "SingletonCookie",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    # robocopy: exit codes 0–7 mean success / partial copy
-    if result.returncode >= 8:
-        raise RuntimeError(f"Profile sync failed (robocopy exit {result.returncode}): {result.stdout}\n{result.stderr}")
-
-    _clear_profile_locks(AUTOMATION_USER_DATA)
-    _clear_profile_locks(dst)
-    return True
+    return root
 
 
 def start_or_attach_chrome() -> webdriver.Chrome:
-    print(f"Configured source profile: {CHROME_PROFILE} under {CHROME_USER_DATA}")
-    print("Closing Chrome so the automation profile can be opened...")
-    _kill_chrome()
-
-    cookies_path = AUTOMATION_USER_DATA / "Default" / "Network" / "Cookies"
-    if RESYNC_FROM_MIKE_EACH_RUN or not cookies_path.exists():
-        synced = _sync_source_profile()
-        if not synced:
-            print("Starting a fresh automation Chrome profile instead.")
-            print("Sign into LinkedIn once in the opened window; later runs will reuse it.")
-            _ensure_automation_profile_dir()
+    global _chrome_proc
+    profile = _ensure_automation_profile_dir()
+    cookies_path = profile / "Default" / "Network" / "Cookies"
+    if cookies_path.exists():
+        print(f"Reusing automation profile at {profile}")
     else:
-        print(f"Reusing automation profile at {AUTOMATION_USER_DATA}")
-        print("(Keeps LinkedIn login. Set RESYNC_FROM_MIKE_EACH_RUN = True to re-copy from source profile.)")
-        _clear_profile_locks(AUTOMATION_USER_DATA)
-        _clear_profile_locks(AUTOMATION_USER_DATA / "Default")
+        print(f"Starting a fresh automation Chrome profile at {profile}")
+        print("Sign into LinkedIn once in the opened window; later runs will reuse it.")
+
+    if _port_open(DEBUG_HOST, DEBUG_PORT):
+        print("Closing a leftover automation Chrome on the debug port...")
+        _kill_job_chrome()
 
     chrome_exe = _find_chrome_exe()
-
-    # Prefer debug-port attach on the *copied* profile (not live User Data).
-    if _port_open(DEBUG_HOST, DEBUG_PORT):
-        # Stale listener from a previous run — kill and relaunch cleanly.
-        _kill_chrome()
-        time.sleep(1)
-
     cmd = [
         str(chrome_exe),
         f"--remote-debugging-port={DEBUG_PORT}",
         f"--remote-debugging-address={DEBUG_HOST}",
-        f"--user-data-dir={AUTOMATION_USER_DATA}",
+        f"--user-data-dir={profile}",
         "--profile-directory=Default",
         "--disable-notifications",
         "--start-maximized",
@@ -565,8 +473,9 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         "about:blank",
     ]
     print(f"Starting automation Chrome: {chrome_exe}")
-    print(f"user-data-dir={AUTOMATION_USER_DATA}")
-    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"user-data-dir={profile}")
+    _chrome_proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _write_chrome_pid(_chrome_proc.pid)
 
     try:
         _wait_for_port(DEBUG_HOST, DEBUG_PORT)
@@ -575,14 +484,15 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         driver_local = webdriver.Chrome(options=options)
         print("Attached to Chrome. Navigating…")
         return driver_local
+    except StopRequested:
+        raise
     except Exception as exc:
         print(f"Debug-port attach failed ({exc}). Falling back to Selenium launch…")
-        _kill_chrome()
-        _clear_profile_locks(AUTOMATION_USER_DATA)
-        _clear_profile_locks(AUTOMATION_USER_DATA / "Default")
+        _kill_job_chrome()
+        _ensure_automation_profile_dir()
         options = Options()
         options.binary_location = str(chrome_exe)
-        options.add_argument(f"--user-data-dir={AUTOMATION_USER_DATA}")
+        options.add_argument(f"--user-data-dir={profile}")
         options.add_argument("--profile-directory=Default")
         options.add_argument("--disable-notifications")
         options.add_argument("--start-maximized")
@@ -591,44 +501,49 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
         driver_local = webdriver.Chrome(options=options)
+        service = getattr(driver_local, "service", None)
+        proc = getattr(service, "process", None)
+        if proc is not None and getattr(proc, "pid", None):
+            _write_chrome_pid(proc.pid)
         print("Selenium launched automation Chrome. Navigating…")
         return driver_local
 
 
-driver = None  # set in __main__ after loading UI config
+driver = None  # set in __main__ after loading job config
 
 
-def load_run_config():
-    """Load names/message/attachment/credentials from run_config.json (written by the UI)."""
-    cfg_path = Path(__file__).resolve().parent / "run_config.json"
-    names = list(people_names)
-    template = MESSAGE_TEMPLATE
-    attachment = ATTACHMENT_PATH
-    email = EMAIL
-    password = PASSWORD
-    if cfg_path.is_file():
-        try:
-            data = json.loads(cfg_path.read_text(encoding="utf-8"))
-            raw_names = data.get("people_names") or []
-            parsed = [n.strip() for n in raw_names if isinstance(n, str) and n.strip()]
-            if parsed:
-                names = parsed
-            if isinstance(data.get("message_template"), str) and data["message_template"].strip():
-                template = data["message_template"]
-            att = data.get("attachment_path")
-            if att:
-                attachment = str(att)
-            elif att is None or att == "":
-                attachment = None
-            user = data.get("linkedin_username") or data.get("email")
-            if isinstance(user, str) and user.strip():
-                email = user.strip()
-            pwd = data.get("linkedin_password") if data.get("linkedin_password") is not None else data.get("password")
-            if isinstance(pwd, str) and pwd:
-                password = pwd
-            print(f"Loaded run_config.json ({len(names)} people).")
-        except Exception as exc:
-            print(f"[WARN] Could not read run_config.json: {exc}")
+def _delete_secrets_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def load_job_config():
+    """Load names/message/attachment/credentials from the job folder. Deletes secrets after read."""
+    if JOB_DIR is None:
+        raise RuntimeError("Job directory is not set.")
+    run_path = JOB_DIR / "run.json"
+    secrets_path = JOB_DIR / "secrets.json"
+    data = json.loads(run_path.read_text(encoding="utf-8"))
+    raw_names = data.get("people_names") or []
+    names = [n.strip() for n in raw_names if isinstance(n, str) and n.strip()]
+    template = data.get("message_template") if isinstance(data.get("message_template"), str) else ""
+    att = data.get("attachment_path")
+    attachment = str(att) if att else None
+    email = ""
+    password = ""
+    try:
+        secret = json.loads(secrets_path.read_text(encoding="utf-8")) if secrets_path.is_file() else {}
+        user = secret.get("linkedin_username") or secret.get("email")
+        if isinstance(user, str) and user.strip():
+            email = user.strip()
+        pwd = secret.get("linkedin_password") if secret.get("linkedin_password") is not None else secret.get("password")
+        if isinstance(pwd, str) and pwd:
+            password = pwd
+    finally:
+        _delete_secrets_file(secrets_path)
+    print(f"Loaded job ({len(names)} people).")
     return names, template, attachment, email, password
 
 
@@ -636,7 +551,7 @@ def load_run_config():
 # Login
 # =========================
 def _dump_login_debug(reason: str) -> Path:
-    shot = Path(__file__).resolve().parent / "login_debug.png"
+    shot = (JOB_DIR or Path(__file__).resolve().parent) / "login_debug.png"
     try:
         driver.save_screenshot(str(shot))
     except Exception:
@@ -741,7 +656,7 @@ def login_to_linkedin(email: str, password: str) -> None:
         _wait_for_manual_login(300)
         return
 
-    print(f"Signing in to LinkedIn as {email}…")
+    print("Signing in to LinkedIn…")
     driver.get("https://www.linkedin.com/login")
     interruptible_sleep(2)
 
@@ -874,11 +789,31 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
 # =========================
 # Run
 # =========================
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Sendline LinkedIn worker")
+    parser.add_argument("--job-dir", required=True, help="Job folder with run.json and secrets.json")
+    parser.add_argument("--user-data-dir", required=True, help="Per-user Chrome user-data-dir")
+    parser.add_argument("--debug-port", type=int, default=9222)
+    return parser.parse_args(argv)
+
+
+def configure(*, job_dir: Path, user_data_dir: Path, debug_port: int) -> None:
+    global JOB_DIR, USER_DATA_DIR, DEBUG_PORT
+    JOB_DIR = Path(job_dir).resolve()
+    USER_DATA_DIR = Path(user_data_dir).resolve()
+    DEBUG_PORT = int(debug_port)
+    JOB_DIR.mkdir(parents=True, exist_ok=True)
+    USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
 if __name__ == "__main__":
+    args = parse_args()
+    configure(job_dir=Path(args.job_dir), user_data_dir=Path(args.user_data_dir), debug_port=int(args.debug_port))
+
     clear_stop_flag()
     stopped = False
     try:
-        run_names, run_template, run_attachment, run_email, run_password = load_run_config()
+        run_names, run_template, run_attachment, run_email, run_password = load_job_config()
         driver = start_or_attach_chrome()
         login_to_linkedin(run_email, run_password)
 
@@ -896,6 +831,11 @@ if __name__ == "__main__":
         stopped = True
     finally:
         shutdown_browser()
+        secrets_left = JOB_DIR / "secrets.json"
+        try:
+            secrets_left.unlink(missing_ok=True)
+        except OSError:
+            pass
         clear_stop_flag()
     if stopped:
         sys.exit(130)

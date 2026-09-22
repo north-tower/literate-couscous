@@ -50,6 +50,9 @@ Desktop.ini
 # Local run config (campaign data — keep a sample checked in if needed)
 run_config.json
 
+# Multi-user data (SQLite, Chrome profiles, attachments, job payloads)
+data/
+
 # Chrome profiles & session data (sensitive; large)
 chrome_automation_data/
 chrome_profile/

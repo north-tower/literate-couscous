@@ -102,8 +102,35 @@ body {
 .brand {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+}
+
+.brand-copy {
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.65rem 1rem;
+  min-width: 0;
+}
+
+.brand-user {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.user-email {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-mark {
@@ -327,7 +354,8 @@ textarea:focus-visible {
 textarea,
 input[type="text"],
 input[type="password"],
-input[type="email"] {
+input[type="email"],
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -736,4 +764,90 @@ input:disabled {
     flex: 1 1 auto;
     text-align: center;
   }
+}
+
+.auth-page {
+  overflow: auto;
+  height: auto;
+  min-height: 100vh;
+}
+
+.auth-stage {
+  position: relative;
+  z-index: 1;
+  width: min(420px, calc(100% - 2rem));
+  margin: 12vh auto 3rem;
+}
+
+.auth-card {
+  margin-top: 1.1rem;
+}
+
+.auth-card .btn.primary {
+  width: 100%;
+}
+
+.admin-stage {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  grid-template-rows: auto auto;
+}
+
+.admin-grid {
+  display: grid;
+  gap: 1rem;
+  min-height: 0;
+}
+
+.admin-users-card {
+  overflow: hidden;
+}
+
+.admin-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-form select,
+.auth-card input,
+.admin-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  font: 500 0.95rem/1.3 var(--font-body);
+  color: var(--ink);
+  background: #fff;
+}
+
+.queue-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-table th {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }

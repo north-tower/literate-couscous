@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log in — Sendline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="auth-page">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="orb orb-a" aria-hidden="true"></div>
+  <div class="orb orb-b" aria-hidden="true"></div>
+
+  <main class="auth-stage">
+    <p class="brand-mark">Sendline</p>
+    <p class="brand-line">Sign in to your workspace. Accounts are invite-only.</p>
+    <form class="card auth-card" id="loginForm">
+      <div class="field compact">
+        <label class="input-label" for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+      </div>
+      <div class="field compact">
+        <label class="input-label" for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn primary" id="loginBtn">
+        <span class="btn-label">Log in</span>
+      </button>
+      <p class="status" id="status" role="status"></p>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById("loginForm");
+    const statusEl = document.getElementById("status");
+    const btn = document.getElementById("loginBtn");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      btn.disabled = true;
+      statusEl.className = "status";
+      statusEl.textContent = "Signing in…";
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          statusEl.className = "status error";
+          statusEl.textContent = data.error || "Could not log in.";
+          btn.disabled = false;
+          return;
+        }
+        window.location.href = "/";
+      } catch (_) {
+        statusEl.className = "status error";
+        statusEl.textContent = "Cannot reach Sendline server.";
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

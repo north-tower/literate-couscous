@@ -8,6 +8,7 @@ const uploadProgressLabel = document.getElementById("uploadProgressLabel");
 const messageEl = document.getElementById("message");
 const linkedinUsernameEl = document.getElementById("linkedinUsername");
 const linkedinPasswordEl = document.getElementById("linkedinPassword");
+const linkedinStatusEl = document.getElementById("linkedinStatus");
 const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 const attachmentField = document.getElementById("attachmentField");
 const attachmentFileEl = document.getElementById("attachmentFile");
@@ -24,11 +25,27 @@ const pulseEl = document.getElementById("pulse");
 const saveBtn = document.getElementById("saveBtn");
 const runBtn = document.getElementById("runBtn");
 const stopBtn = document.getElementById("stopBtn");
+const userEmailEl = document.getElementById("userEmail");
+const adminLinkEl = document.getElementById("adminLink");
+const logoutBtn = document.getElementById("logoutBtn");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
 const TEMPLATE_NAME_HEADER = "name";
 const TEMPLATE_ERROR =
   "This file doesn’t match the template. Download the template, keep the name header, and put one full name per row.";
+
+async function api(url, options = {}) {
+  const res = await fetch(url, { credentials: "same-origin", ...options });
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("auth");
+  }
+  return res;
+}
+
+function isActiveStatus(status) {
+  return status === "queued" || status === "running" || status === "stopping";
+}
 
 let logCursor = 0;
 let pollTimer = null;
@@ -37,6 +54,10 @@ let attachmentPath = null;
 let attachmentName = null;
 let attachmentUploading = false;
 let stopRequested = false;
+let linkedinConnected = false;
+let currentJobId = null;
+let hadActiveJob = false;
+let jobPeopleCount = 0;
 
 const STATUS_ICONS = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>',
@@ -116,7 +137,12 @@ function applyConfig(cfg) {
   namesEl.value = (cfg.people_names || []).join("\n");
   messageEl.value = cfg.message_template || "";
   linkedinUsernameEl.value = cfg.linkedin_username || "";
-  linkedinPasswordEl.value = cfg.linkedin_password || "";
+  linkedinPasswordEl.value = "";
+  linkedinConnected = Boolean(cfg.linkedin_connected);
+  linkedinPasswordEl.placeholder = linkedinConnected ? "Leave blank to keep saved password" : "Password";
+  if (linkedinStatusEl) {
+    linkedinStatusEl.textContent = linkedinConnected ? "saved" : "used to sign in";
+  }
   attachmentPath = cfg.attachment_path || null;
   attachmentName = cfg.attachment_name || fileNameFromPath(attachmentPath) || null;
   setAttachmentUi();
@@ -124,7 +150,7 @@ function applyConfig(cfg) {
 }
 
 async function loadConfig() {
-  const res = await fetch("/api/config");
+  const res = await api("/api/config");
   if (!res.ok) throw new Error("config HTTP " + res.status);
   const cfg = await res.json();
   applyConfig(cfg);
@@ -132,7 +158,7 @@ async function loadConfig() {
 
 async function saveConfig(quiet = false) {
   try {
-    const res = await fetch("/api/config", {
+    const res = await api("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payloadFromForm()),
@@ -142,9 +168,11 @@ async function saveConfig(quiet = false) {
       if (!quiet) setStatus(data.error || "Save failed", "error");
       return null;
     }
+    if (data.config) applyConfig(data.config);
     if (!quiet) setStatus(`Saved ${data.count} people`, "ok");
     return data;
   } catch (err) {
+    if (err && err.message === "auth") return null;
     if (!quiet) setStatus("Cannot reach Sendline server. Run: py app.py", "error");
     return null;
   }
@@ -398,6 +426,7 @@ function uploadAttachmentFile(file) {
 
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/attachment");
+  xhr.withCredentials = true;
   xhr.upload.addEventListener("progress", (event) => {
     if (!event.lengthComputable) return;
     showAttachmentProgress((event.loaded / event.total) * 100);
@@ -411,6 +440,10 @@ function uploadAttachmentFile(file) {
     try {
       data = JSON.parse(xhr.responseText);
     } catch (_) {}
+    if (xhr.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
     if (xhr.status < 200 || xhr.status >= 300 || !data.ok) {
       setStatus(data.error || "Attachment upload failed", "error");
       return;
@@ -434,7 +467,7 @@ function uploadAttachmentFile(file) {
 
 async function clearAttachment() {
   try {
-    const res = await fetch("/api/attachment", { method: "DELETE" });
+    const res = await api("/api/attachment", { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setStatus(data.error || "Could not remove attachment", "error");
@@ -449,16 +482,47 @@ async function clearAttachment() {
   }
 }
 
-function setRunningUi(running) {
-  runBtn.disabled = running;
-  stopBtn.hidden = !running;
-  uploadAttachmentBtn.disabled = running || attachmentUploading;
-  clearAttachmentBtn.disabled = running;
-  linkedinUsernameEl.disabled = running;
-  linkedinPasswordEl.disabled = running;
-  togglePasswordBtn.disabled = running;
-  if (!running) stopBtn.disabled = false;
-  if (running) pulseEl.dataset.state = "running";
+function setRunningUi(active) {
+  runBtn.disabled = active;
+  stopBtn.hidden = !active;
+  uploadAttachmentBtn.disabled = active || attachmentUploading;
+  clearAttachmentBtn.disabled = active;
+  linkedinUsernameEl.disabled = active;
+  linkedinPasswordEl.disabled = active;
+  togglePasswordBtn.disabled = active;
+  if (!active) stopBtn.disabled = false;
+  if (active) pulseEl.dataset.state = "running";
+}
+
+function applyJobState(data) {
+  const status = data.job_status || (data.running ? "running" : "idle");
+  const mine = Boolean(data.is_mine);
+  const active = mine && isActiveStatus(status);
+  if (data.job_id && data.job_id !== currentJobId) {
+    if (status === "running" || status === "queued") {
+      logCursor = 0;
+    }
+    currentJobId = data.job_id;
+  }
+  if (typeof data.people_count === "number") jobPeopleCount = data.people_count;
+  setRunningUi(active);
+  if (active) hadActiveJob = true;
+  if (status === "queued" && mine) {
+    const n = data.queue_position || 1;
+    setStatus("Waiting — another campaign is using Chrome (position " + n + ")", "running");
+    pulseEl.dataset.state = "running";
+  } else if (status === "running" && mine) {
+    const count = data.people_count || jobPeopleCount;
+    setStatus(
+      count ? "Running for " + count + " people — watch Chrome + the live log" : "Running — watch Chrome + the live log",
+      "running"
+    );
+    pulseEl.dataset.state = "running";
+  } else if (status === "stopping" && mine) {
+    setStatus("Stopping — closing Chrome…", "running");
+    pulseEl.dataset.state = "running";
+  }
+  return { active, status, mine };
 }
 
 function logLineClass(line) {
@@ -494,28 +558,31 @@ function appendLogs(lines) {
 
 async function pollLogs() {
   try {
-    const res = await fetch(`/api/logs?after=${logCursor}`);
+    const res = await api(`/api/logs?after=${logCursor}`);
     const data = await res.json();
     appendLogs(data.lines || []);
     logCursor = data.next ?? logCursor;
-    setRunningUi(!!data.running);
-    if (!data.running) {
+    const state = applyJobState(data);
+    if (!state.active) {
       clearInterval(pollTimer);
       pollTimer = null;
+      if (!hadActiveJob) return;
       const code = data.exit_code;
-      if (code === 0) {
+      if (code === 0 || data.job_status === "done") {
         pulseEl.dataset.state = "done";
         setStatus("Worker finished successfully", "ok");
-      } else if (stopRequested || code === 1 || code === 130) {
+      } else if (stopRequested || data.job_status === "cancelled" || code === 1 || code === 130) {
         pulseEl.dataset.state = "stopped";
         setStatus("Worker stopped — Chrome was force-closed", "stopped");
-      } else {
+      } else if (data.job_status === "failed") {
         pulseEl.dataset.state = "error";
         setStatus("Worker failed — check the log", "error");
       }
       stopRequested = false;
+      hadActiveJob = false;
     }
-  } catch (_) {
+  } catch (err) {
+    if (err && err.message === "auth") return;
     setStatus("Lost connection to Sendline server", "error");
   }
 }
@@ -529,7 +596,7 @@ function startPolling() {
 async function launch() {
   try {
     const creds = payloadFromForm();
-    if (!creds.linkedin_username || !creds.linkedin_password) {
+    if (!creds.linkedin_username || (!creds.linkedin_password && !linkedinConnected)) {
       setStatus("Add your LinkedIn username and password before launching.", "error");
       pulseEl.dataset.state = "error";
       return;
@@ -538,10 +605,11 @@ async function launch() {
     logEl.replaceChildren();
     logCursor = 0;
     stopRequested = false;
+    hadActiveJob = true;
     pulseEl.dataset.state = "running";
     setRunningUi(true);
 
-    const res = await fetch("/api/run", {
+    const res = await api("/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payloadFromForm()),
@@ -551,29 +619,47 @@ async function launch() {
       setStatus(data.error || "Launch failed", "error");
       pulseEl.dataset.state = "error";
       setRunningUi(false);
+      hadActiveJob = false;
       return;
     }
-    setStatus(`Running for ${data.count} people — watch Chrome + the live log`, "running");
+    if (data.config) applyConfig(data.config);
+    jobPeopleCount = data.count || 0;
+    currentJobId = data.job_id || null;
+    if (data.job_status === "queued" || res.status === 202) {
+      const n = data.queue_position || 1;
+      setStatus("Waiting — another campaign is using Chrome (position " + n + ")", "running");
+    } else {
+      setStatus(`Running for ${data.count} people — watch Chrome + the live log`, "running");
+    }
     startPolling();
   } catch (err) {
+    if (err && err.message === "auth") return;
     setStatus("Cannot reach Sendline server. Run: py app.py", "error");
     pulseEl.dataset.state = "error";
     setRunningUi(false);
+    hadActiveJob = false;
   }
 }
 
 async function stop() {
   try {
     stopBtn.disabled = true;
-    const res = await fetch("/api/stop", { method: "POST" });
+    const res = await api("/api/stop", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       stopBtn.disabled = false;
       setStatus(data.error || "Stop failed", "error");
       return;
     }
-    setStatus("Stopping — closing Chrome…", "running");
     stopRequested = true;
+    if (data.job_status === "cancelled") {
+      setStatus("Removed from the Chrome queue", "stopped");
+      setRunningUi(false);
+      hadActiveJob = false;
+      pulseEl.dataset.state = "stopped";
+      return;
+    }
+    setStatus("Stopping — closing Chrome…", "running");
   } catch (_) {
     stopBtn.disabled = false;
     setStatus("Cannot reach Sendline server", "error");
@@ -651,4 +737,31 @@ attachmentField.addEventListener("drop", (event) => {
   uploadAttachmentFile(file);
 });
 
-loadConfig().catch(() => setStatus("Could not load config — is py app.py running?", "error"));
+logoutBtn.addEventListener("click", async () => {
+  await api("/api/logout", { method: "POST" }).catch(() => {});
+  window.location.href = "/login";
+});
+
+async function boot() {
+  try {
+    const meRes = await api("/api/me");
+    const meData = await meRes.json();
+    if (meData.user) {
+      userEmailEl.textContent = meData.user.email || "";
+      if (meData.user.role === "admin") adminLinkEl.hidden = false;
+    }
+    await loadConfig();
+    const statusRes = await api("/api/status");
+    const statusData = await statusRes.json();
+    const state = applyJobState(statusData);
+    if (state.active) {
+      hadActiveJob = true;
+      startPolling();
+    }
+  } catch (err) {
+    if (err && err.message === "auth") return;
+    setStatus("Could not load Sendline — is py app.py running?", "error");
+  }
+}
+
+boot();

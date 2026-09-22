@@ -16,8 +16,15 @@
 
   <main class="stage">
     <header class="brand">
-      <p class="brand-mark">Sendline</p>
-      <p class="brand-line">Queue the names. Launch the worker. Watch it move.</p>
+      <div class="brand-copy">
+        <p class="brand-mark">Sendline</p>
+        <p class="brand-line">Queue the names. Launch the worker. Watch it move.</p>
+      </div>
+      <div class="brand-user">
+        <span class="user-email" id="userEmail"></span>
+        <a class="text-btn" id="adminLink" href="/admin" hidden>Admin</a>
+        <button type="button" class="text-btn" id="logoutBtn">Log out</button>
+      </div>
     </header>
 
     <section class="workspace" aria-label="Campaign controls">
@@ -26,7 +33,7 @@
         <div class="card" id="linkedinField">
           <div class="field-head">
             <span class="field-label">LinkedIn credentials</span>
-            <span class="meta tip">used to sign in</span>
+            <span class="meta tip" id="linkedinStatus">used to sign in</span>
           </div>
           <div class="cred-grid">
             <div class="field compact">
@@ -53,7 +60,7 @@
               </div>
             </div>
           </div>
-          <p class="field-hint">The worker fills these on LinkedIn if you are not already signed in. Stored only on this computer.</p>
+          <p class="field-hint" id="linkedinHint">Saved encrypted on this server. Leave the password blank to keep the one already stored.</p>
         </div>
 
         <div class="card field" id="namesField">
