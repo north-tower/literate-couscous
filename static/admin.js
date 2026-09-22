@@ -46,6 +46,10 @@ function renderQueue(queue) {
   });
 }
 
+function roleLabel(role) {
+  return role === "admin" ? "Can manage users" : "Campaign user";
+}
+
 function renderUsers(users) {
   usersBody.replaceChildren();
   for (const user of users || []) {
@@ -53,7 +57,7 @@ function renderUsers(users) {
     const email = document.createElement("td");
     email.textContent = user.email;
     const role = document.createElement("td");
-    role.textContent = user.role;
+    role.textContent = roleLabel(user.role);
     const state = document.createElement("td");
     state.textContent = user.is_active ? "Active" : "Disabled";
     const actions = document.createElement("td");

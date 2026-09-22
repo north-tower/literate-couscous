@@ -570,7 +570,7 @@ async function pollLogs() {
       const code = data.exit_code;
       if (code === 0 || data.job_status === "done") {
         pulseEl.dataset.state = "done";
-        setStatus("Worker finished successfully", "ok");
+        setStatus("Sending finished successfully", "ok");
       } else if (stopRequested || data.job_status === "cancelled" || code === 1 || code === 130) {
         pulseEl.dataset.state = "stopped";
         setStatus("Worker stopped — Chrome was force-closed", "stopped");
@@ -616,7 +616,7 @@ async function launch() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(data.error || "Launch failed", "error");
+      setStatus(data.error || "Could not start sending", "error");
       pulseEl.dataset.state = "error";
       setRunningUi(false);
       hadActiveJob = false;

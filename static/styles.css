@@ -851,3 +851,105 @@ input:disabled {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
+
+.landing-stage {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.4rem 0 3rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.landing-hero h1,
+.step h2,
+.landing-note h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: -0.04em;
+  color: var(--ink);
+}
+
+.landing-hero h1 {
+  font-size: clamp(2rem, 5vw, 2.7rem);
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.landing-hero p,
+.step p,
+.landing-note p {
+  margin: 0.45rem 0 0;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.step {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.9rem;
+}
+
+.step-num {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.step code {
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-size: 0.88em;
+  color: var(--accent-deep);
+}
+
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.landing-cta .btn.primary {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-aside {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+}
+
+.auth-aside a {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.brand-user .btn.primary {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.5rem 0.95rem;
+}

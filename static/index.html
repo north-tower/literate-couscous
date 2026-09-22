@@ -18,11 +18,12 @@
     <header class="brand">
       <div class="brand-copy">
         <p class="brand-mark">Sendline</p>
-        <p class="brand-line">Queue the names. Launch the worker. Watch it move.</p>
+        <p class="brand-line">Add people, write the message, then start sending.</p>
       </div>
       <div class="brand-user">
         <span class="user-email" id="userEmail"></span>
-        <a class="text-btn" id="adminLink" href="/admin" hidden>Admin</a>
+        <a class="text-btn" href="/welcome">Getting started</a>
+        <a class="text-btn" id="adminLink" href="/admin" hidden>Manage users</a>
         <button type="button" class="text-btn" id="logoutBtn">Log out</button>
       </div>
     </header>
@@ -32,7 +33,7 @@
         <div class="panel-scroll">
         <div class="card" id="linkedinField">
           <div class="field-head">
-            <span class="field-label">LinkedIn credentials</span>
+            <span class="field-label">Your LinkedIn login</span>
             <span class="meta tip" id="linkedinStatus">used to sign in</span>
           </div>
           <div class="cred-grid">
@@ -117,7 +118,7 @@
             <button type="button" class="btn ghost" id="saveBtn">Save</button>
             <button type="button" class="btn danger" id="stopBtn" hidden>Stop</button>
             <button type="button" class="btn primary" id="runBtn">
-              <span class="btn-label">Launch worker</span>
+              <span class="btn-label">Start sending</span>
               <span class="btn-shine" aria-hidden="true"></span>
             </button>
           </div>
@@ -125,11 +126,11 @@
         </div>
       </div>
 
-      <aside class="log-panel" aria-label="Live worker log">
+      <aside class="log-panel" aria-label="Live send log">
         <div class="log-head">
           <div class="log-head-left">
             <span class="pulse" id="pulse" data-state="idle"></span>
-            <span class="log-title">Live run</span>
+            <span class="log-title">Live log</span>
           </div>
           <span class="log-follow">Following</span>
         </div>

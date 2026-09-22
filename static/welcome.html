@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Getting started — Sendline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="auth-page landing-page">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="orb orb-a" aria-hidden="true"></div>
+  <div class="orb orb-b" aria-hidden="true"></div>
+
+  <main class="landing-stage">
+    <header class="brand">
+      <div class="brand-copy">
+        <p class="brand-mark">Sendline</p>
+        <p class="brand-line">Invite-only. One campaign uses Chrome at a time.</p>
+      </div>
+      <div class="brand-user">
+        <a class="btn primary" href="/login">Log in</a>
+      </div>
+    </header>
+
+    <section class="landing-hero">
+      <h1>Getting started</h1>
+      <p>An admin creates your account. You sign in, connect your own LinkedIn, then send the first campaign when Chrome is free.</p>
+    </section>
+
+    <ol class="steps">
+      <li class="card step">
+        <span class="step-num" aria-hidden="true">1</span>
+        <div>
+          <h2>Get your invite</h2>
+          <p>There is no public sign-up. An admin creates you as a Campaign user and sends the email and temporary password in a private message.</p>
+        </div>
+      </li>
+      <li class="card step">
+        <span class="step-num" aria-hidden="true">2</span>
+        <div>
+          <h2>Sign in</h2>
+          <p>Use that email and password on the login page. You land on your own campaign. Your people list stays on your account.</p>
+        </div>
+      </li>
+      <li class="card step">
+        <span class="step-num" aria-hidden="true">3</span>
+        <div>
+          <h2>Connect your LinkedIn</h2>
+          <p>Enter your own LinkedIn username and password. Sendline stores the password encrypted and does not share it. On later visits, leave the password blank to keep the one already saved.</p>
+        </div>
+      </li>
+      <li class="card step">
+        <span class="step-num" aria-hidden="true">4</span>
+        <div>
+          <h2>Write the campaign</h2>
+          <p>Add one full name per line, or download the CSV template and upload it. The message must include <code>{name}</code>, filled with each person’s first name. An attachment is optional and must be under 25 MB.</p>
+        </div>
+      </li>
+      <li class="card step">
+        <span class="step-num" aria-hidden="true">5</span>
+        <div>
+          <h2>Launch the first time while Chrome is free</h2>
+          <p>Chrome opens on your profile. If LinkedIn asks you to sign in or complete two-factor, do that in the automation window. Later runs reuse that session.</p>
+        </div>
+      </li>
+    </ol>
+
+    <section class="card landing-note">
+      <h2>One Chrome for everyone</h2>
+      <p>If another client is already sending, your launch waits in line and starts when theirs finishes. The page shows “Waiting — another campaign is using Chrome.” You also cannot start a second campaign of your own until the first one ends. Stop closes only your run.</p>
+    </section>
+
+    <div class="landing-cta">
+      <a class="btn primary" href="/login">Log in</a>
+      <a class="text-btn" id="campaignLink" href="/" hidden>Open campaign</a>
+    </div>
+  </main>
+  <script>
+    fetch("/api/me", { credentials: "same-origin" })
+      .then((res) => {
+        if (res.ok) document.getElementById("campaignLink").hidden = false;
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

@@ -151,9 +151,15 @@ def _save_campaign_from_body(user_id: int, body: dict) -> dict:
 
 
 @app.get("/")
-@auth.login_required
 def index():
+    if not auth.current_user():
+        return redirect("/welcome")
     return send_from_directory(STATIC_DIR, "index.html")
+
+
+@app.get("/welcome")
+def welcome_page():
+    return send_from_directory(STATIC_DIR, "welcome.html")
 
 
 @app.get("/login")
