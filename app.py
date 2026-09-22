@@ -11,12 +11,19 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, request, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+ROOT = Path(__file__).resolve().parent
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+except ImportError:
+    pass
+
 import auth
 import db
 import jobs
 import vault
 
-ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 ALLOWED_ATTACHMENT_EXT = {

@@ -23,7 +23,7 @@ FLASK_SECRET_FILE = db.DATA_DIR / "flask_secret.txt"
 
 
 def load_flask_secret() -> str:
-    env = (os.environ.get("SECRET_KEY") or "").strip()
+    env = _env("SECRET_KEY")
     if env:
         return env
     db.DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -53,11 +53,18 @@ def verify_password(password_hash: str, password: str) -> bool:
         return False
 
 
+def _env(name: str) -> str:
+    value = (os.environ.get(name) or "").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1].strip()
+    return value
+
+
 def bootstrap_admin() -> None:
     if db.user_count() > 0:
         return
-    email = (os.environ.get("SENDLINE_ADMIN_EMAIL") or "").strip().lower()
-    password = os.environ.get("SENDLINE_ADMIN_PASSWORD") or ""
+    email = _env("SENDLINE_ADMIN_EMAIL").lower()
+    password = _env("SENDLINE_ADMIN_PASSWORD")
     if not email or not password:
         print(
             "[sendline] No users yet. Set SENDLINE_ADMIN_EMAIL and SENDLINE_ADMIN_PASSWORD "
