@@ -748,7 +748,7 @@ async function boot() {
     const meData = await meRes.json();
     if (meData.user) {
       userEmailEl.textContent = meData.user.email || "";
-      if (meData.user.role === "admin") adminLinkEl.hidden = false;
+      adminLinkEl.hidden = meData.user.role !== "admin";
     }
     await loadConfig();
     const statusRes = await api("/api/status");

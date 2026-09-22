@@ -24,6 +24,10 @@
 
 * { box-sizing: border-box; }
 
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   height: 100%;
@@ -855,11 +859,36 @@ input:disabled {
 .landing-stage {
   position: relative;
   z-index: 1;
-  width: min(760px, calc(100% - 2rem));
+  width: min(720px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 1.4rem 0 3rem;
+  padding: 1.25rem 0 3.5rem;
   display: grid;
+  gap: 1.35rem;
+}
+
+.landing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+}
+
+.landing-bar .btn.primary {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.5rem 0.95rem;
+}
+
+.landing-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
 }
 
 .landing-hero h1,
@@ -872,18 +901,33 @@ input:disabled {
 }
 
 .landing-hero h1 {
-  font-size: clamp(2rem, 5vw, 2.7rem);
+  font-size: clamp(2.1rem, 5vw, 2.85rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 0.98;
 }
 
 .landing-hero p,
 .step p,
 .landing-note p {
-  margin: 0.45rem 0 0;
+  margin: 0.55rem 0 0;
   color: var(--ink-soft);
   font-size: 1rem;
   line-height: 1.5;
+}
+
+.landing-hero .landing-rule {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.landing-page .card:hover {
+  transform: none;
+  box-shadow: var(--shadow);
 }
 
 .steps {
@@ -891,27 +935,44 @@ input:disabled {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .step {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  gap: 0.9rem;
+  gap: 0.85rem;
+  padding: 0.95rem 1.05rem;
+}
+
+.step h2 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.step p {
+  margin-top: 0.3rem;
+  font-size: 0.92rem;
 }
 
 .step-num {
-  width: 2rem;
-  height: 2rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  margin-top: 0.05rem;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-soft);
-  color: var(--accent-deep);
+  background: var(--accent);
+  color: #f4fffb;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 0.95rem;
+}
+
+.landing-note {
+  background: #f7faf8;
+  gap: 0.35rem;
 }
 
 .step code {
