@@ -1,3 +1,59 @@
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("fonts/cabinet-grotesk-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("fonts/cabinet-grotesk-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/inter-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/inter-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/inter-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/inter-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("fonts/geist-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ink: #14221c;
   --ink-soft: #5b6b64;
@@ -15,8 +71,10 @@
   --ok-soft: rgba(15, 122, 98, 0.12);
   --console: #101816;
   --console-line: #1c2622;
-  --font-display: "Syne", sans-serif;
-  --font-body: "Figtree", sans-serif;
+  --font-heading: "Cabinet Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-display: var(--font-heading);
   --radius: 16px;
   --shadow: 0 1px 0 rgba(20, 32, 28, 0.04), 0 10px 28px rgba(20, 40, 34, 0.06);
   --shadow-lift: 0 1px 0 rgba(20, 32, 28, 0.05), 0 14px 32px rgba(20, 40, 34, 0.1);
@@ -139,8 +197,8 @@ body {
 
 .brand-mark {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 800;
+  font-family: var(--font-heading);
+  font-weight: 700;
   font-size: clamp(1.65rem, 3.4vw, 2.05rem);
   letter-spacing: -0.05em;
   line-height: 1;
@@ -473,7 +531,7 @@ input:disabled {
 #names {
   min-height: 168px;
   resize: vertical;
-  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.84rem;
   line-height: 1.55;
 }
@@ -703,7 +761,7 @@ input:disabled {
   min-height: 0;
   height: 100%;
   max-height: none;
-  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.65;
   color: #7d9a92;
@@ -884,8 +942,9 @@ input:disabled {
 
 .landing-hero .landing-kicker {
   margin: 0 0 0.7rem;
+  font-family: var(--font-body);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-deep);
@@ -895,14 +954,15 @@ input:disabled {
 .step h2,
 .landing-note h2 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   letter-spacing: -0.03em;
   color: var(--ink);
 }
 
 .landing-hero h1 {
+  font-family: var(--font-heading);
   font-size: clamp(2.1rem, 5vw, 2.85rem);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.05;
 }
 
@@ -927,7 +987,8 @@ input:disabled {
   border-radius: 10px;
   background: #b7dccb;
   color: #0b3d30;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: 500;
   font-size: 1rem;
   line-height: 1.6;
 }
@@ -962,8 +1023,9 @@ input:disabled {
 
 .step h2,
 .landing-note h2 {
+  font-family: var(--font-heading);
   font-size: 1.28rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
 }
 
@@ -985,8 +1047,8 @@ input:disabled {
   align-self: baseline;
   background: var(--accent);
   color: #f4fffb;
-  font-family: var(--font-display);
-  font-weight: 800;
+  font-family: var(--font-heading);
+  font-weight: 700;
   font-size: 0.95rem;
   line-height: 1;
 }
@@ -1004,9 +1066,9 @@ input:disabled {
   border-radius: 6px;
   background: #d7efe6;
   color: #0b3d30;
-  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.86em;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
   vertical-align: baseline;
 }
