@@ -9,6 +9,7 @@ const proxyForm = document.getElementById("proxyForm");
 const proxySaveBtn = document.getElementById("proxySaveBtn");
 const proxyMeta = document.getElementById("proxyMeta");
 const proxySummary = document.getElementById("proxySummary");
+const proxyLines = document.getElementById("proxyLines");
 const proxyStatus = document.getElementById("proxyStatus");
 let proxiesConfigured = false;
 
@@ -68,6 +69,14 @@ function setProxyStatus(text, kind = "") {
 
 function renderProxies(data) {
   proxiesConfigured = Boolean(data && data.configured);
+  proxyLines.replaceChildren();
+  const used = new Set((data && data.assigned ? data.assigned : []).filter((row) => row.mode !== "sticky").map((row) => row.label));
+  (data && data.static_masked ? data.static_masked : []).forEach((line) => {
+    const item = document.createElement("li");
+    const inUse = [...used].some((label) => label && line.endsWith(label));
+    item.textContent = inUse ? `${line} — in use` : `${line} — free`;
+    proxyLines.appendChild(item);
+  });
   if (!data || !data.configured) {
     proxyMeta.textContent = "off";
     proxySummary.textContent = "No proxies yet. Campaigns use this server's IP until you add some.";

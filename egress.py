@@ -284,12 +284,10 @@ def assign_proxy(user_id: int) -> ParsedProxy | None:
 def pool_summary() -> dict:
     static, template = load_pool()
     assigned = []
-    static_used = 0
+    used_static: set[tuple[str, int, str]] = set()
     for row in db.list_proxy_secrets():
         if not (row.get("proxy_label") or row.get("proxy_ciphertext")):
             continue
-        if row.get("proxy_mode") == "static":
-            static_used += 1
         assigned.append(
             {
                 "id": row["id"],
@@ -298,6 +296,16 @@ def pool_summary() -> dict:
                 "mode": row.get("proxy_mode") or "",
             }
         )
+        if (row.get("proxy_mode") or "static") == "sticky":
+            continue
+        cipher = row.get("proxy_ciphertext") or ""
+        if not cipher:
+            continue
+        try:
+            used_static.add(parse_proxy_line(vault.decrypt_password(cipher)).identity)
+        except (EgressError, ValueError):
+            continue
+    free_count = sum(1 for item in static if item.identity not in used_static)
     masked_template = ""
     if template:
         try:
@@ -312,7 +320,8 @@ def pool_summary() -> dict:
     return {
         "configured": bool(static or template),
         "static_count": len(static),
-        "free_count": max(0, len(static) - static_used),
+        "free_count": free_count,
+        "static_masked": [item.masked() for item in static],
         "template": bool(template),
         "template_masked": masked_template,
         "assigned": assigned,
