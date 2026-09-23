@@ -874,12 +874,20 @@ def _write_pace_result(outcome: str, note: str) -> None:
         print(f"[WARN] Could not save pace result: {exc}")
 
 
-def _wait_until_send_allowed(sends: list, limits: pace.Limits) -> list:
+def _pace_stop(decision: pace.Decision, left: int) -> None:
+    message = decision.log_message
+    if left > 0:
+        message = message.rstrip(".") + f". {left} people are still on the list."
+    raise PaceStop(decision.outcome, message, decision.note)
+
+
+def _wait_until_send_allowed(sends: list, limits: pace.Limits, left: int, *, check_page: bool) -> list:
     """Sleep through a short hourly wait. Stop the run if a longer cap is full."""
     while True:
         if should_stop():
             raise StopRequested()
-        _raise_if_linkedin_limited()
+        if check_page:
+            _raise_if_linkedin_limited()
         decision = pace.decide(sends, time.time(), limits)
         if decision.action == "send":
             return sends
@@ -887,7 +895,7 @@ def _wait_until_send_allowed(sends: list, limits: pace.Limits) -> list:
             print(decision.log_message)
             interruptible_sleep(decision.seconds)
             continue
-        raise PaceStop(decision.outcome, decision.log_message, decision.note)
+        _pace_stop(decision, left)
 
 
 if __name__ == "__main__":
@@ -897,6 +905,7 @@ if __name__ == "__main__":
     clear_stop_flag()
     stopped = False
     pace_code = 0
+    browser_started = False
     try:
         (
             run_names,
@@ -909,8 +918,6 @@ if __name__ == "__main__":
         ) = load_job_config()
         limits = pace.limits_for(run_preset)
         sends = pace.load_sends(run_ledger)
-        driver = start_or_attach_chrome()
-        login_to_linkedin(run_email, run_password)
 
         pending: list[str] = []
         now = time.time()
@@ -929,11 +936,15 @@ if __name__ == "__main__":
             print("Everyone on this list was already messaged in the last 90 days.")
         else:
             print(f"{len(pending)} people left after skipping recent messages.")
+            sends = _wait_until_send_allowed(sends, limits, len(pending), check_page=False)
+            browser_started = True
+            driver = start_or_attach_chrome()
+            login_to_linkedin(run_email, run_password)
 
         for index, full_name in enumerate(pending):
             if should_stop():
                 raise StopRequested()
-            sends = _wait_until_send_allowed(sends, limits)
+            sends = _wait_until_send_allowed(sends, limits, len(pending) - index, check_page=True)
             first_name = full_name.split()[0]
             msg = run_template.format(name=first_name)
             outcome = start_new_chat_and_send_message(full_name, msg, run_attachment)
@@ -945,11 +956,7 @@ if __name__ == "__main__":
                 break
             gap = pace.wait_after_send(sends, time.time(), limits)
             if gap.action == "stop":
-                left = len(pending) - index - 1
-                print(gap.log_message)
-                if left:
-                    print(f"{left} people are still on the list.")
-                raise PaceStop(gap.outcome, gap.log_message, gap.note)
+                _pace_stop(gap, len(pending) - index - 1)
             print(gap.log_message)
             interruptible_sleep(gap.seconds)
     except PaceStop as exc:
@@ -963,7 +970,8 @@ if __name__ == "__main__":
         print("Interrupted — closing Chrome.")
         stopped = True
     finally:
-        shutdown_browser()
+        if browser_started:
+            shutdown_browser()
         secrets_left = JOB_DIR / "secrets.json"
         try:
             secrets_left.unlink(missing_ok=True)

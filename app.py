@@ -182,6 +182,11 @@ def welcome_page():
     return send_from_directory(STATIC_DIR, "welcome.html")
 
 
+@app.get("/terms")
+def terms_page():
+    return send_from_directory(STATIC_DIR, "terms.html")
+
+
 @app.get("/login")
 def login_page():
     if auth.current_user():
