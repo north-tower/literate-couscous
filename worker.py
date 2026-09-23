@@ -11,6 +11,8 @@ from typing import Iterable, Optional
 
 import pyperclip
 
+import pace
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -112,6 +114,23 @@ SELECTORS = {
 # =========================
 class StopRequested(Exception):
     """User clicked Stop in the UI (or Ctrl+C)."""
+
+
+class PaceStop(Exception):
+    """Daily, weekly, or hourly cap — or LinkedIn is showing an account limit."""
+
+    def __init__(self, outcome: str, log_message: str, note: str):
+        super().__init__(log_message)
+        self.outcome = outcome
+        self.note = note
+
+
+_LINKEDIN_LIMIT_PHRASES = (
+    "unusual activity from your account",
+    "your account has been restricted",
+    "temporarily restricted",
+    "reached the weekly invitation limit",
+)
 
 
 def _stop_flag() -> Path:
@@ -543,8 +562,11 @@ def load_job_config():
             password = pwd
     finally:
         _delete_secrets_file(secrets_path)
+    preset = pace.normalize(data.get("pace_preset"))
+    ledger = data.get("ledger_path")
+    ledger_path = Path(str(ledger)) if isinstance(ledger, str) and ledger.strip() else pace.ledger_path(JOB_DIR)
     print(f"Loaded job ({len(names)} people).")
-    return names, template, attachment, email, password
+    return names, template, attachment, email, password, preset, ledger_path
 
 
 # =========================
@@ -598,6 +620,7 @@ def _wait_for_manual_login(timeout: int = 300) -> None:
             raise StopRequested()
         if _is_logged_in(2):
             print("Logged in to LinkedIn.")
+            _raise_if_linkedin_limited()
             return
         interruptible_sleep(2)
     _dump_login_debug("LinkedIn login timed out")
@@ -641,12 +664,41 @@ def _click_login_submit() -> bool:
         return False
 
 
+def linkedin_limit_message() -> str | None:
+    """Return a short reason if LinkedIn is showing an account restriction."""
+    try:
+        text = driver.execute_script(
+            "return (document.body && document.body.innerText) ? document.body.innerText.slice(0, 8000) : ''"
+        )
+    except Exception:
+        return None
+    if not isinstance(text, str) or not text:
+        return None
+    lowered = text.lower()
+    for phrase in _LINKEDIN_LIMIT_PHRASES:
+        if phrase in lowered:
+            return phrase
+    return None
+
+
+def _raise_if_linkedin_limited() -> None:
+    phrase = linkedin_limit_message()
+    if not phrase:
+        return
+    raise PaceStop(
+        "restricted",
+        "LinkedIn is showing an account limit (" + phrase + "). Stopped so this account is not pushed further.",
+        "LinkedIn showed an account limit, so sending stopped.",
+    )
+
+
 def login_to_linkedin(email: str, password: str) -> None:
     print("Opening LinkedIn feed…")
     driver.get("https://www.linkedin.com/feed/")
     interruptible_sleep(4)
     if _is_logged_in(15):
         print("Already logged in — continuing.")
+        _raise_if_linkedin_limited()
         return
 
     if not email or not password:
@@ -684,6 +736,7 @@ def login_to_linkedin(email: str, password: str) -> None:
         interruptible_sleep(3)
         if _is_logged_in(20):
             print("Logged in to LinkedIn.")
+            _raise_if_linkedin_limited()
             return
         print("Login not finished yet — complete any extra LinkedIn check in Chrome if shown.")
         _wait_for_manual_login(180)
@@ -695,12 +748,13 @@ def login_to_linkedin(email: str, password: str) -> None:
 # =========================
 # New message flow
 # =========================
-def start_new_chat_and_send_message(person_name: str, message: str, attachment_path: Optional[str]) -> None:
+def start_new_chat_and_send_message(person_name: str, message: str, attachment_path: Optional[str]) -> str:
     if should_stop():
         raise StopRequested()
     driver.get("https://www.linkedin.com/messaging/thread/new/")
     print("Opening new message window...")
     interruptible_sleep(SLEEPS["pre_message_page"])
+    _raise_if_linkedin_limited()
 
     # Select recipient via Enter (top suggestion)
     try:
@@ -718,7 +772,7 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
             print("[INFO] Couldn’t confirm chip via selector; proceeding anyway.")
     except TimeoutException:
         print(f"Could not select {person_name}. Moving onto the next person.")
-        return
+        return "skipped"
 
     try:
         # Focus the New message editor
@@ -735,14 +789,14 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         # Verify there is content before proceeding (turns editor white)
         if editor_text_len(driver, message_box) == 0:
             print("[ERROR] Editor still empty after paste/typing; skipping send.")
-            return
+            return "skipped"
 
         # Attach file (optional), then close LinkedIn's upload box before Send.
         if attachment_path:
             attach_file = str(Path(attachment_path))
             if not Path(attach_file).is_file():
                 print(f"[ERROR] Attachment file not found: {attach_file}")
-                return
+                return "skipped"
             file_input = None
             try:
                 file_input = wait_for_any(driver, SELECTORS["file_input"], EC.presence_of_element_located, 3)
@@ -780,11 +834,14 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         click_js(driver, send_button)
         print(f"Message and attachment (if any) sent to {person_name}.")
         interruptible_sleep(SLEEPS["after_send"])
+        return "sent"
 
+    except PaceStop:
+        raise
     except (TimeoutException, NoSuchElementException, ElementClickInterceptedException) as e:
         print(f"Failed to send the message to {person_name}: {e}")
         driver.get("https://www.linkedin.com/messaging/thread/new/")
-        return
+        return "skipped"
 
 # =========================
 # Run
@@ -806,23 +863,99 @@ def configure(*, job_dir: Path, user_data_dir: Path, debug_port: int) -> None:
     USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _write_pace_result(outcome: str, note: str) -> None:
+    if JOB_DIR is None:
+        return
+    path = JOB_DIR / "pace_result.json"
+    payload = {"outcome": outcome, "note": note}
+    try:
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError as exc:
+        print(f"[WARN] Could not save pace result: {exc}")
+
+
+def _wait_until_send_allowed(sends: list, limits: pace.Limits) -> list:
+    """Sleep through a short hourly wait. Stop the run if a longer cap is full."""
+    while True:
+        if should_stop():
+            raise StopRequested()
+        _raise_if_linkedin_limited()
+        decision = pace.decide(sends, time.time(), limits)
+        if decision.action == "send":
+            return sends
+        if decision.action == "wait":
+            print(decision.log_message)
+            interruptible_sleep(decision.seconds)
+            continue
+        raise PaceStop(decision.outcome, decision.log_message, decision.note)
+
+
 if __name__ == "__main__":
     args = parse_args()
     configure(job_dir=Path(args.job_dir), user_data_dir=Path(args.user_data_dir), debug_port=int(args.debug_port))
 
     clear_stop_flag()
     stopped = False
+    pace_code = 0
     try:
-        run_names, run_template, run_attachment, run_email, run_password = load_job_config()
+        (
+            run_names,
+            run_template,
+            run_attachment,
+            run_email,
+            run_password,
+            run_preset,
+            run_ledger,
+        ) = load_job_config()
+        limits = pace.limits_for(run_preset)
+        sends = pace.load_sends(run_ledger)
         driver = start_or_attach_chrome()
         login_to_linkedin(run_email, run_password)
 
+        pending: list[str] = []
+        now = time.time()
         for full_name in run_names:
+            previous = pace.recent_send_at(sends, full_name, now)
+            if previous is not None:
+                print(f"Skipping {full_name} — already messaged on {pace.format_local(previous)}.")
+                continue
+            pending.append(full_name)
+
+        print(
+            f"Pace: {limits.label}. Up to {limits.daily}/day and {limits.weekly}/week, "
+            f"with {limits.min_gap // 60}–{limits.max_gap // 60} minutes between messages."
+        )
+        if not pending:
+            print("Everyone on this list was already messaged in the last 90 days.")
+        else:
+            print(f"{len(pending)} people left after skipping recent messages.")
+
+        for index, full_name in enumerate(pending):
             if should_stop():
                 raise StopRequested()
+            sends = _wait_until_send_allowed(sends, limits)
             first_name = full_name.split()[0]
             msg = run_template.format(name=first_name)
-            start_new_chat_and_send_message(full_name, msg, run_attachment)
+            outcome = start_new_chat_and_send_message(full_name, msg, run_attachment)
+            if outcome != "sent":
+                interruptible_sleep(8)
+                continue
+            sends = pace.append_send(run_ledger, full_name)
+            if index + 1 >= len(pending):
+                break
+            gap = pace.wait_after_send(sends, time.time(), limits)
+            if gap.action == "stop":
+                left = len(pending) - index - 1
+                print(gap.log_message)
+                if left:
+                    print(f"{left} people are still on the list.")
+                raise PaceStop(gap.outcome, gap.log_message, gap.note)
+            print(gap.log_message)
+            interruptible_sleep(gap.seconds)
+    except PaceStop as exc:
+        print(str(exc))
+        _write_pace_result(exc.outcome, exc.note)
+        pace_code = 75
     except StopRequested:
         print("Stop requested — closing Chrome.")
         stopped = True
@@ -837,5 +970,7 @@ if __name__ == "__main__":
         except OSError:
             pass
         clear_stop_flag()
+    if pace_code:
+        sys.exit(pace_code)
     if stopped:
         sys.exit(130)

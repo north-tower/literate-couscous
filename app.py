@@ -2,6 +2,7 @@
 """Sendline — multi-user UI, auth, and one-Chrome job queue."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -22,6 +23,7 @@ except ImportError:
 import auth
 import db
 import jobs
+import pace
 import vault
 
 STATIC_DIR = ROOT / "static"
@@ -100,6 +102,20 @@ def _remove_managed_attachment(user_id: int, path_str: str | None) -> None:
         pass
 
 
+def _pace_note(job: dict | None) -> str:
+    if not job or job.get("status") != "paused":
+        return ""
+    path = db.job_dir(int(job["user_id"]), int(job["id"])) / "pace_result.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return "Pace limit reached. Start again later — already-messaged people are skipped."
+    note = data.get("note") if isinstance(data, dict) else ""
+    if isinstance(note, str) and note.strip():
+        return note.strip()
+    return "Pace limit reached. Start again later — already-messaged people are skipped."
+
+
 def _public_config(user_id: int) -> dict:
     campaign = db.get_campaign(user_id)
     secret = db.get_linkedin_secret(user_id)
@@ -117,6 +133,8 @@ def _public_config(user_id: int) -> dict:
         "linkedin_connected": connected,
         "attachment_path": att_path,
         "attachment_name": att_name,
+        "pace_preset": campaign.get("pace_preset") or "careful",
+        "pace": pace.public_usage(db.user_dir(user_id), campaign.get("pace_preset")),
     }
 
 
@@ -133,10 +151,12 @@ def _save_campaign_from_body(user_id: int, body: dict) -> dict:
     if template is not None:
         template = str(template).replace("\r\n", "\n")
 
+    preset = body.get("pace_preset")
     db.upsert_campaign(
         user_id,
         people_names=names,
         message_template=template,
+        pace_preset=None if preset is None else str(preset),
     )
 
     username = body.get("linkedin_username")
@@ -325,6 +345,8 @@ def api_logs():
             "queue_position": db.queue_position(int(job["id"])) if job else None,
             "is_mine": bool(job and job.get("user_id") == user["id"] and status in db.JOB_OPEN),
             "exit_code": None if running or status in db.JOB_OPEN else (job or {}).get("exit_code"),
+            "pace_note": _pace_note(job),
+            "pace": pace.public_usage(db.user_dir(int(user["id"])), db.get_campaign(int(user["id"])).get("pace_preset")),
         }
     )
 

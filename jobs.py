@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import db
+import pace
 import vault
 
 ROOT = Path(__file__).resolve().parent
@@ -179,6 +180,8 @@ def _write_job_payload(user_id: int, job_id: int) -> None:
                 "people_names": campaign["people_names"],
                 "message_template": campaign["message_template"],
                 "attachment_path": campaign.get("attachment_path"),
+                "pace_preset": pace.normalize(campaign.get("pace_preset")),
+                "ledger_path": str(pace.ledger_path(db.user_dir(user_id))),
             },
             indent=2,
             ensure_ascii=False,
@@ -312,6 +315,8 @@ def _watch(proc: subprocess.Popen, job_id: int, user_id: int) -> None:
     if status in ("running", "stopping", "queued"):
         if code == 0:
             final = "done"
+        elif code == 75:
+            final = "paused"
         elif code in (1, 130) or status == "stopping":
             final = "cancelled"
         else:
