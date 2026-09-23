@@ -60,6 +60,20 @@
         <p class="status" id="status" role="status"></p>
       </div>
 
+      <div class="card">
+        <div class="field-head">
+          <span class="field-label">Residential exits</span>
+          <span class="meta tip" id="proxyMeta">off</span>
+        </div>
+        <p class="field-hint" id="proxySummary">No proxies yet. Campaigns use this server's IP until you add some.</p>
+        <form class="admin-form" id="proxyForm">
+          <textarea id="proxyList" rows="6" spellcheck="false" autocomplete="off" placeholder="http://user:pass@host:port&#10;host:port:user:pass&#10;http://user-session-{session}:pass@gate.example.com:7000"></textarea>
+          <button type="submit" class="btn primary" id="proxySaveBtn">Save proxy list</button>
+        </form>
+        <p class="field-hint">One static residential IP per line, and each client keeps that IP. Or one gateway line with <code>{session}</code> so each client gets a different sticky IP from the same provider. Passwords stay on this server. Remove a burned IP from the list, then release that client.</p>
+        <p class="status" id="proxyStatus" role="status"></p>
+      </div>
+
       <div class="card admin-users-card">
         <div class="field-head">
           <span class="field-label">Users</span>
@@ -71,6 +85,7 @@
               <tr>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Exit</th>
                 <th>Status</th>
                 <th></th>
               </tr>

@@ -11,6 +11,7 @@ from typing import Iterable, Optional
 
 import pyperclip
 
+import egress
 import pace
 
 from selenium import webdriver
@@ -31,6 +32,8 @@ USER_DATA_DIR: Path | None = None
 DEBUG_HOST = "127.0.0.1"
 DEBUG_PORT = 9222
 _chrome_proc: subprocess.Popen | None = None
+_forwarder: egress.LocalForwarder | None = None
+PROXY_LOCAL_PORT: int | None = None
 
 # =========================
 # CONFIG (selectors, waits)
@@ -159,6 +162,34 @@ def interruptible_sleep(seconds: float) -> None:
         if remaining <= 0:
             return
         time.sleep(min(0.2, remaining))
+
+
+def start_residential_proxy(proxy_url: str) -> None:
+    global _forwarder, PROXY_LOCAL_PORT
+    stop_residential_proxy()
+    parsed = egress.parse_proxy_line(proxy_url)
+    forwarder = egress.LocalForwarder(parsed)
+    forwarder.start()
+    _forwarder = forwarder
+    PROXY_LOCAL_PORT = forwarder.port
+    try:
+        public_ip = egress.probe(forwarder.port)
+    except Exception:
+        stop_residential_proxy()
+        raise
+    if public_ip:
+        print(f"Residential exit {parsed.label} is up (public IP {public_ip}).")
+    else:
+        print(f"Residential exit {parsed.label} accepted a connection.")
+
+
+def stop_residential_proxy() -> None:
+    global _forwarder, PROXY_LOCAL_PORT
+    forwarder = _forwarder
+    _forwarder = None
+    PROXY_LOCAL_PORT = None
+    if forwarder is not None:
+        forwarder.stop()
 
 
 def shutdown_browser() -> None:
@@ -453,6 +484,16 @@ def _clear_profile_locks(folder: Path) -> None:
             pass
 
 
+def _proxy_chrome_args() -> list[str]:
+    if not PROXY_LOCAL_PORT:
+        return []
+    return [
+        f"--proxy-server=http://127.0.0.1:{PROXY_LOCAL_PORT}",
+        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+    ]
+
+
 def _ensure_automation_profile_dir() -> Path:
     root = _automation_user_data()
     dst = root / "Default"
@@ -489,6 +530,7 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-session-crashed-bubble",
+        *_proxy_chrome_args(),
         "about:blank",
     ]
     print(f"Starting automation Chrome: {chrome_exe}")
@@ -517,6 +559,8 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         options.add_argument("--start-maximized")
         options.add_argument("--no-first-run")
         options.add_argument("--no-default-browser-check")
+        for arg in _proxy_chrome_args():
+            options.add_argument(arg)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
         driver_local = webdriver.Chrome(options=options)
@@ -552,6 +596,7 @@ def load_job_config():
     attachment = str(att) if att else None
     email = ""
     password = ""
+    proxy_url = ""
     try:
         secret = json.loads(secrets_path.read_text(encoding="utf-8")) if secrets_path.is_file() else {}
         user = secret.get("linkedin_username") or secret.get("email")
@@ -560,13 +605,16 @@ def load_job_config():
         pwd = secret.get("linkedin_password") if secret.get("linkedin_password") is not None else secret.get("password")
         if isinstance(pwd, str) and pwd:
             password = pwd
+        raw_proxy = secret.get("proxy_url")
+        if isinstance(raw_proxy, str) and raw_proxy.strip():
+            proxy_url = raw_proxy.strip()
     finally:
         _delete_secrets_file(secrets_path)
     preset = pace.normalize(data.get("pace_preset"))
     ledger = data.get("ledger_path")
     ledger_path = Path(str(ledger)) if isinstance(ledger, str) and ledger.strip() else pace.ledger_path(JOB_DIR)
     print(f"Loaded job ({len(names)} people).")
-    return names, template, attachment, email, password, preset, ledger_path
+    return names, template, attachment, email, password, preset, ledger_path, proxy_url
 
 
 # =========================
@@ -915,6 +963,7 @@ if __name__ == "__main__":
             run_password,
             run_preset,
             run_ledger,
+            run_proxy,
         ) = load_job_config()
         limits = pace.limits_for(run_preset)
         sends = pace.load_sends(run_ledger)
@@ -937,6 +986,8 @@ if __name__ == "__main__":
         else:
             print(f"{len(pending)} people left after skipping recent messages.")
             sends = _wait_until_send_allowed(sends, limits, len(pending), check_page=False)
+            if run_proxy:
+                start_residential_proxy(run_proxy)
             browser_started = True
             driver = start_or_attach_chrome()
             login_to_linkedin(run_email, run_password)
@@ -959,6 +1010,9 @@ if __name__ == "__main__":
                 _pace_stop(gap, len(pending) - index - 1)
             print(gap.log_message)
             interruptible_sleep(gap.seconds)
+    except egress.EgressError as exc:
+        print(str(exc))
+        pace_code = 1
     except PaceStop as exc:
         print(str(exc))
         _write_pace_result(exc.outcome, exc.note)
@@ -972,6 +1026,7 @@ if __name__ == "__main__":
     finally:
         if browser_started:
             shutdown_browser()
+        stop_residential_proxy()
         secrets_left = JOB_DIR / "secrets.json"
         try:
             secrets_left.unlink(missing_ok=True)

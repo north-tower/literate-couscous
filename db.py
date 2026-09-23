@@ -114,6 +114,13 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE campaigns ADD COLUMN pace_preset TEXT NOT NULL DEFAULT 'careful'"
             )
+        user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "proxy_ciphertext" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN proxy_ciphertext TEXT NOT NULL DEFAULT ''")
+        if "proxy_label" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN proxy_label TEXT NOT NULL DEFAULT ''")
+        if "proxy_mode" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN proxy_mode TEXT NOT NULL DEFAULT ''")
 
 
 def execute(sql: str, params: Iterable[Any] = ()) -> sqlite3.Cursor:
@@ -179,7 +186,36 @@ def create_user(email: str, password_hash: str, role: str = "operator") -> dict[
 
 def list_users() -> list[dict[str, Any]]:
     return fetchall(
-        "SELECT id, email, role, is_active, created_at FROM users ORDER BY created_at ASC, id ASC"
+        """SELECT id, email, role, is_active, created_at, proxy_label, proxy_mode
+           FROM users ORDER BY created_at ASC, id ASC"""
+    )
+
+
+def get_user_proxy(user_id: int) -> dict[str, Any] | None:
+    return fetchone(
+        "SELECT id, proxy_ciphertext, proxy_label, proxy_mode FROM users WHERE id = ?",
+        (user_id,),
+    )
+
+
+def set_user_proxy(user_id: int, ciphertext: str, label: str, mode: str) -> None:
+    execute(
+        "UPDATE users SET proxy_ciphertext = ?, proxy_label = ?, proxy_mode = ? WHERE id = ?",
+        (ciphertext, label, mode, user_id),
+    )
+
+
+def clear_user_proxy(user_id: int) -> None:
+    execute(
+        "UPDATE users SET proxy_ciphertext = '', proxy_label = '', proxy_mode = '' WHERE id = ?",
+        (user_id,),
+    )
+
+
+def list_proxy_secrets() -> list[dict[str, Any]]:
+    return fetchall(
+        """SELECT id, email, proxy_ciphertext, proxy_label, proxy_mode
+           FROM users ORDER BY id ASC"""
     )
 
 

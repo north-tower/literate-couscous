@@ -22,6 +22,7 @@ except ImportError:
 
 import auth
 import db
+import egress
 import jobs
 import pace
 import vault
@@ -415,6 +416,8 @@ def api_admin_users():
                 "role": row["role"],
                 "is_active": bool(row["is_active"]),
                 "created_at": row["created_at"],
+                "proxy_label": row.get("proxy_label") or "",
+                "proxy_mode": row.get("proxy_mode") or "",
             }
         )
     return jsonify({"ok": True, "users": users, "queue": db.queue_snapshot()})
@@ -463,6 +466,45 @@ def api_admin_enable(user_id: int):
         return jsonify({"ok": False, "error": "User not found."}), 404
     updated = db.set_user_active(user_id, True)
     return jsonify({"ok": True, "user": auth.public_user(updated or target)})
+
+
+@app.get("/api/admin/proxies")
+@auth.admin_required
+def api_admin_proxies():
+    try:
+        summary = egress.pool_summary()
+    except egress.EgressError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, **summary})
+
+
+@app.post("/api/admin/proxies")
+@auth.admin_required
+def api_admin_save_proxies():
+    body = request.get_json(force=True, silent=True) or {}
+    text = body.get("proxies")
+    if not isinstance(text, str):
+        return jsonify({"ok": False, "error": "Paste the proxy list."}), 400
+    try:
+        egress.save_pool_text(text)
+        summary = egress.pool_summary()
+    except egress.EgressError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, **summary})
+
+
+@app.post("/api/admin/users/<int:user_id>/proxy/release")
+@auth.admin_required
+def api_admin_release_proxy(user_id: int):
+    target = db.get_user_by_id(user_id)
+    if not target:
+        return jsonify({"ok": False, "error": "User not found."}), 404
+    if db.open_job_for_user(user_id):
+        return jsonify(
+            {"ok": False, "error": "Wait until this client's campaign is finished, then release the exit."}
+        ), 400
+    db.clear_user_proxy(user_id)
+    return jsonify({"ok": True})
 
 
 def setup() -> None:

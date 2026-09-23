@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import db
+import egress
 import pace
 import vault
 
@@ -172,6 +173,10 @@ def _write_job_payload(user_id: int, job_id: int) -> None:
     campaign = db.get_campaign(user_id)
     secret = db.get_linkedin_secret(user_id)
     password = vault.decrypt_password(secret.get("password_ciphertext") or "")
+    try:
+        proxy = egress.assign_proxy(user_id)
+    except egress.EgressError as exc:
+        raise RuntimeError(str(exc)) from exc
     run_path = folder / "run.json"
     secrets_path = folder / "secrets.json"
     run_path.write_text(
@@ -194,6 +199,7 @@ def _write_job_payload(user_id: int, job_id: int) -> None:
             {
                 "linkedin_username": secret.get("username") or "",
                 "linkedin_password": password,
+                "proxy_url": proxy.as_url() if proxy else "",
             },
             indent=2,
             ensure_ascii=False,
@@ -242,6 +248,11 @@ def _spawn(job: dict) -> None:
 
     db.update_job(job_id, status="running", started_at=job.get("started_at") or time.time())
     append_log(job_id, f"[sendline] launching worker for {job.get('people_count') or 0} people...")
+    label = (db.get_user_proxy(user_id) or {}).get("proxy_label") or ""
+    if label:
+        append_log(job_id, f"[sendline] residential exit {label}")
+    else:
+        append_log(job_id, "[sendline] no residential proxy configured — this run uses the server IP")
     append_log(job_id, f"[sendline] python: {python}")
 
     try:
