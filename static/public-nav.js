@@ -16,6 +16,8 @@
   const headerUserEmail = document.getElementById("headerUserEmail");
   const ctaPrimaryGuest = document.getElementById("ctaPrimaryGuest");
   const ctaPrimaryUser = document.getElementById("ctaPrimaryUser");
+  const ctaBandGuest = document.getElementById("ctaBandGuest");
+  const ctaBandUser = document.getElementById("ctaBandUser");
 
   function setNavCurrent() {
     const links = document.querySelectorAll(".app-nav [data-nav]");
@@ -37,6 +39,8 @@
     if (headerUserChip) headerUserChip.hidden = true;
     if (ctaPrimaryGuest) ctaPrimaryGuest.hidden = false;
     if (ctaPrimaryUser) ctaPrimaryUser.hidden = true;
+    if (ctaBandGuest) ctaBandGuest.hidden = false;
+    if (ctaBandUser) ctaBandUser.hidden = true;
     setNavCurrent();
   }
 
@@ -57,6 +61,8 @@
     }
     if (ctaPrimaryGuest) ctaPrimaryGuest.hidden = true;
     if (ctaPrimaryUser) ctaPrimaryUser.hidden = false;
+    if (ctaBandGuest) ctaBandGuest.hidden = true;
+    if (ctaBandUser) ctaBandUser.hidden = false;
     setNavCurrent();
   }
 

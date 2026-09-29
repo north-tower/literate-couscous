@@ -3,108 +3,193 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Getting started — Sendline</title>
+  <title>Sendline — LinkedIn outreach for operators</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-page landing-page" data-nav-page="guide">
+<body class="auth-page landing-page landing-page--home" data-nav-page="guide">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
+  <div class="orb orb-c" aria-hidden="true"></div>
 
-  <div class="doc-column">
-  <header class="app-header app-header--doc">
-    <div class="app-header__inner">
-      <a class="brand-lockup brand-lockup--link" id="brandHomeLink" href="/welcome" data-href-guest="/welcome" data-href-user="/">
-        <span class="brand-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m22 2-7 20-4-9-9-4Z" />
-            <path d="M22 2 11 13" />
-          </svg>
-        </span>
-        <span class="brand-mark">Sendline</span>
-      </a>
-      <nav class="app-nav" aria-label="Primary">
-        <a class="app-nav__link" id="navCampaign" href="/" hidden data-nav="campaign">Campaign</a>
-        <a class="app-nav__link is-active" href="/welcome" data-nav="guide">Guide</a>
-        <a class="app-nav__link" href="/terms" data-nav="terms">Terms</a>
-        <a class="app-nav__link" id="navAdmin" href="/admin" hidden data-nav="admin">Admin</a>
-      </nav>
-      <div class="app-header__end">
-        <span class="user-chip" id="headerUserChip" hidden>
-          <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
-          <span class="user-email" id="headerUserEmail"></span>
-        </span>
-        <a class="btn primary btn--compact" id="headerLoginBtn" href="/login">Log in</a>
-        <button type="button" class="app-nav__link app-nav__link--button" id="headerLogoutBtn" hidden>Log out</button>
+  <div class="landing-shell">
+    <header class="app-header app-header--doc app-header--landing">
+      <div class="app-header__inner">
+        <a class="brand-lockup brand-lockup--link" id="brandHomeLink" href="/welcome" data-href-guest="/welcome" data-href-user="/">
+          <span class="brand-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </span>
+          <span class="brand-mark">Sendline</span>
+        </a>
+        <nav class="app-nav" aria-label="Primary">
+          <a class="app-nav__link" id="navCampaign" href="/" hidden data-nav="campaign">Campaign</a>
+          <a class="app-nav__link is-active" href="/welcome" data-nav="guide">Guide</a>
+          <a class="app-nav__link" href="/terms" data-nav="terms">Terms</a>
+          <a class="app-nav__link" id="navAdmin" href="/admin" hidden data-nav="admin">Admin</a>
+        </nav>
+        <div class="app-header__end">
+          <span class="user-chip" id="headerUserChip" hidden>
+            <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
+            <span class="user-email" id="headerUserEmail"></span>
+          </span>
+          <a class="btn primary btn--compact" id="headerLoginBtn" href="/login">Log in</a>
+          <button type="button" class="app-nav__link app-nav__link--button" id="headerLogoutBtn" hidden>Log out</button>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main class="landing-stage landing-stage--in-column">
+    <main class="landing-stage landing-stage--home">
+      <section class="landing-hero landing-hero--epic" aria-labelledby="heroTitle">
+        <div class="landing-hero__copy">
+          <p class="landing-kicker">Operator outreach · Local by design</p>
+          <h1 id="heroTitle">LinkedIn messages you can <span class="landing-gradient-text">personalize</span>, launch, and watch live</h1>
+          <p class="landing-hero-lead">Paste a curated list, write one template with <code>{name}</code>, attach a deck if you need to — then Sendline walks LinkedIn in Chrome while you follow every step in the log.</p>
+          <div class="landing-hero-cta">
+            <a class="btn primary landing-hero-btn" id="ctaPrimaryGuest" href="/login">
+              <span class="btn-label">Log in to workspace</span>
+              <span class="btn-shine" aria-hidden="true"></span>
+            </a>
+            <a class="btn primary landing-hero-btn" id="ctaPrimaryUser" href="/" hidden>
+              <span class="btn-label">Open your campaign</span>
+              <span class="btn-shine" aria-hidden="true"></span>
+            </a>
+            <a class="text-btn" href="/terms">Sending pace &amp; caps</a>
+          </div>
+          <p class="landing-hero-note">Invite-only. An admin creates your account — there is no public sign-up.</p>
+        </div>
 
-    <section class="landing-hero">
-      <p class="landing-kicker">Onboarding</p>
-      <h1>Getting started</h1>
-      <p>An admin creates your account. You sign in, connect your own LinkedIn, then send the first campaign when Chrome is free.</p>
-      <p class="landing-rule">
+        <aside class="landing-preview" aria-label="Product preview">
+          <div class="landing-preview__frame">
+            <div class="landing-preview__chrome">
+              <span class="window-dot window-dot--close"></span>
+              <span class="window-dot window-dot--min"></span>
+              <span class="window-dot window-dot--max"></span>
+              <span class="landing-preview__title">Campaign workspace</span>
+            </div>
+            <div class="landing-preview__body">
+              <div class="preview-card preview-card--wide">
+                <span class="preview-label">People</span>
+                <span class="preview-pill">12 loaded</span>
+                <div class="preview-lines" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+              <div class="preview-split">
+                <div class="preview-card">
+                  <span class="preview-label">Message</span>
+                  <p class="preview-msg">Hi <em>{name}</em>, …</p>
+                </div>
+                <div class="preview-card preview-card--log">
+                  <span class="preview-label">Live log</span>
+                  <div class="preview-log" aria-hidden="true">
+                    <span class="log-line log-line--ok">Sent to Alex M.</span>
+                    <span class="log-line log-line--info">Waiting 2m 14s…</span>
+                    <span class="log-line">Next: Jordan Lee</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="landing-highlights" aria-label="Key capabilities">
+        <article class="highlight-card">
+          <span class="highlight-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          <h2>Your machine</h2>
+          <p>Runs on the operator PC. LinkedIn session and credentials stay local to your setup.</p>
+        </article>
+        <article class="highlight-card">
+          <span class="highlight-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+          </span>
+          <h2><code>{name}</code> built in</h2>
+          <p>One template, first-name personalization, optional attachment on every send.</p>
+        </article>
+        <article class="highlight-card">
+          <span class="highlight-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </span>
+          <h2>Paced sending</h2>
+          <p>Careful daily caps and gaps between messages — see <a href="/terms">terms</a> for limits.</p>
+        </article>
+      </section>
+
+      <div class="landing-section-head">
+        <p class="landing-kicker">Onboarding</p>
+        <h2 class="landing-section-title">Five steps to your first campaign</h2>
+        <p class="landing-section-lead">Everything below is the same flow your admin expects you to follow after invite.</p>
+      </div>
+
+      <p class="landing-rule landing-rule--center">
         <svg class="landing-rule-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
           <path d="M12 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           <circle cx="12" cy="8" r="1.1" fill="currentColor" />
         </svg>
-        <span>Only one campaign uses Chrome. If someone else is already sending, yours waits until theirs finishes.</span>
+        <span>Only one campaign uses Chrome at a time. If someone else is sending, yours waits in line until theirs finishes.</span>
       </p>
-    </section>
 
-    <ol class="steps">
-      <li class="card step">
-        <span class="step-num" aria-hidden="true">1</span>
-        <div>
-          <h2>Get your invite</h2>
-          <p>There is no public sign-up. An admin creates you as a Campaign user and sends the email and temporary password in a private message.</p>
-        </div>
-      </li>
-      <li class="card step">
-        <span class="step-num" aria-hidden="true">2</span>
-        <div>
-          <h2>Sign in</h2>
-          <p>Use that email and password on the login page. You land on your own campaign. Your people list stays on your account.</p>
-        </div>
-      </li>
-      <li class="card step">
-        <span class="step-num" aria-hidden="true">3</span>
-        <div>
-          <h2>Connect your LinkedIn</h2>
-          <p>Enter your own LinkedIn username and password. Sendline stores the password encrypted and does not share it. On later visits, leave the password blank to keep the one already saved.</p>
-        </div>
-      </li>
-      <li class="card step">
-        <span class="step-num" aria-hidden="true">4</span>
-        <div>
-          <h2>Write the campaign</h2>
-          <p>Add one full name per line, or download the CSV template and upload it. The message must include <code>{name}</code>, filled with each person’s first name. An attachment is optional and must be under 25 MB.</p>
-        </div>
-      </li>
-      <li class="card step">
-        <span class="step-num" aria-hidden="true">5</span>
-        <div>
-          <h2>Launch the first time while Chrome is free</h2>
-          <p>Chrome opens on your profile. If LinkedIn asks you to sign in or complete two-factor, do that in the automation window. Later runs reuse that session.</p>
-        </div>
-      </li>
-    </ol>
+      <ol class="steps steps--bento">
+        <li class="card step">
+          <span class="step-num" aria-hidden="true">1</span>
+          <div>
+            <h2>Get your invite</h2>
+            <p>An admin creates you as a Campaign user and sends email plus a temporary password privately.</p>
+          </div>
+        </li>
+        <li class="card step">
+          <span class="step-num" aria-hidden="true">2</span>
+          <div>
+            <h2>Sign in</h2>
+            <p>Use that email and password on the login page. Your people list stays on your account.</p>
+          </div>
+        </li>
+        <li class="card step">
+          <span class="step-num" aria-hidden="true">3</span>
+          <div>
+            <h2>Connect LinkedIn</h2>
+            <p>Enter your LinkedIn login once — stored encrypted. Leave password blank on later visits to keep the saved one.</p>
+          </div>
+        </li>
+        <li class="card step">
+          <span class="step-num" aria-hidden="true">4</span>
+          <div>
+            <h2>Write the campaign</h2>
+            <p>One full name per line or upload the CSV template. Message must include <code>{name}</code>. Attachment optional, under 25 MB.</p>
+          </div>
+        </li>
+        <li class="card step step--span">
+          <span class="step-num" aria-hidden="true">5</span>
+          <div>
+            <h2>Launch while Chrome is free</h2>
+            <p>Chrome opens on your profile. Complete LinkedIn sign-in or 2FA in that window once; later runs reuse the session. Watch the live log and stop anytime.</p>
+          </div>
+        </li>
+      </ol>
 
-    <section class="card landing-note">
-      <h2>One Chrome for everyone</h2>
-      <p>If another client is already sending, your launch waits in line and starts when theirs finishes. The page shows “Waiting — another campaign is using Chrome.” You also cannot start a second campaign of your own until the first one ends. Stop closes only your run.</p>
-    </section>
+      <section class="card landing-note landing-note--wide">
+        <h2>One Chrome for everyone</h2>
+        <p>If another client is already sending, your launch waits in line. The UI shows when Chrome is busy. You cannot start a second campaign of your own until the first ends — Stop only closes your run.</p>
+      </section>
 
-    <div class="landing-cta">
-      <a class="btn primary" id="ctaPrimaryGuest" href="/login">Log in</a>
-      <a class="btn primary" id="ctaPrimaryUser" href="/" hidden>Open campaign</a>
-      <a class="text-btn" href="/terms">Sending terms</a>
-    </div>
-  </main>
+      <div class="landing-cta landing-cta--band">
+        <div class="landing-cta__copy">
+          <h2>Ready when your invite arrives</h2>
+          <p>Log in, connect LinkedIn, and send your first curated batch at a safe pace.</p>
+        </div>
+        <div class="landing-cta__actions">
+          <a class="btn primary" id="ctaBandGuest" href="/login">Log in</a>
+          <a class="btn primary" id="ctaBandUser" href="/" hidden>Open campaign</a>
+          <a class="text-btn" href="/terms">Read sending terms</a>
+        </div>
+      </div>
+    </main>
   </div>
   <script src="/static/public-nav.js"></script>
 </body>
