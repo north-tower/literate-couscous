@@ -27,6 +27,8 @@ const pulseEl = document.getElementById("pulse");
 const saveBtn = document.getElementById("saveBtn");
 const runBtn = document.getElementById("runBtn");
 const stopBtn = document.getElementById("stopBtn");
+const userChipEl = document.getElementById("userChip");
+const userAvatarEl = document.getElementById("userAvatar");
 const userEmailEl = document.getElementById("userEmail");
 const adminLinkEl = document.getElementById("adminLink");
 const logoutBtn = document.getElementById("logoutBtn");
@@ -807,7 +809,14 @@ async function boot() {
     const meRes = await api("/api/me");
     const meData = await meRes.json();
     if (meData.user) {
-      userEmailEl.textContent = meData.user.email || "";
+      const email = meData.user.email || "";
+      userEmailEl.textContent = email;
+      if (email && userChipEl) {
+        userChipEl.hidden = false;
+        if (userAvatarEl) {
+          userAvatarEl.textContent = email.charAt(0).toUpperCase();
+        }
+      }
       adminLinkEl.hidden = meData.user.role !== "admin";
     }
     await loadConfig();

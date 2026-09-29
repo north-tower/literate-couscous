@@ -12,9 +12,17 @@
   <div class="orb orb-b" aria-hidden="true"></div>
 
   <main class="auth-stage">
-    <p class="brand-mark">Sendline</p>
-    <p class="brand-line">Sign in to your workspace. Accounts are invite-only.</p>
-    <form class="card auth-card" id="loginForm">
+    <div class="auth-brand">
+      <span class="brand-icon brand-icon--lg" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m22 2-7 20-4-9-9-4Z" />
+          <path d="M22 2 11 13" />
+        </svg>
+      </span>
+      <p class="brand-mark">Sendline</p>
+    </div>
+    <p class="brand-line auth-tagline">Sign in to your workspace. Accounts are invite-only.</p>
+    <form class="card auth-card auth-card--glass" id="loginForm">
       <div class="field compact">
         <label class="input-label" for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required />

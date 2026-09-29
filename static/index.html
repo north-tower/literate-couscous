@@ -12,13 +12,24 @@
   <div class="orb orb-b" aria-hidden="true"></div>
 
   <main class="stage">
-    <header class="brand">
+    <header class="brand brand-glass">
       <div class="brand-copy">
-        <p class="brand-mark">Sendline</p>
+        <div class="brand-lockup">
+          <span class="brand-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </span>
+          <p class="brand-mark">Sendline</p>
+        </div>
         <p class="brand-line">Add people, write the message, then start sending.</p>
       </div>
       <div class="brand-user">
-        <span class="user-email" id="userEmail"></span>
+        <span class="user-chip" id="userChip" hidden>
+          <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
+          <span class="user-email" id="userEmail"></span>
+        </span>
         <a class="text-btn" href="/welcome">Getting started</a>
         <a class="text-btn" href="/terms">Sending terms</a>
         <a class="text-btn" id="adminLink" href="/admin" hidden>Manage users</a>
@@ -82,7 +93,7 @@
           </div>
         </div>
 
-        <div class="card field">
+        <div class="card field" id="messageField">
           <div class="field-head">
             <label for="message">Message</label>
             <span class="meta tip">use {name}</span>
@@ -152,6 +163,11 @@
       <aside class="log-panel" aria-label="Live send log">
         <div class="log-head">
           <div class="log-head-left">
+            <div class="window-dots" aria-hidden="true">
+              <span class="window-dot window-dot--close"></span>
+              <span class="window-dot window-dot--min"></span>
+              <span class="window-dot window-dot--max"></span>
+            </div>
             <span class="pulse" id="pulse" data-state="idle"></span>
             <span class="log-title">Live log</span>
           </div>
