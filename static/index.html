@@ -6,36 +6,43 @@
   <title>Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body>
+<body class="app-shell">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
-  <main class="stage">
-    <header class="brand brand-glass">
-      <div class="brand-copy">
-        <div class="brand-lockup">
-          <span class="brand-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m22 2-7 20-4-9-9-4Z" />
-              <path d="M22 2 11 13" />
-            </svg>
-          </span>
-          <p class="brand-mark">Sendline</p>
-        </div>
-        <p class="brand-line">Add people, write the message, then start sending.</p>
-      </div>
-      <div class="brand-user">
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand-lockup brand-lockup--link" href="/">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+          </svg>
+        </span>
+        <span class="brand-mark">Sendline</span>
+      </a>
+      <nav class="app-nav" aria-label="Primary">
+        <a class="app-nav__link is-active" href="/" aria-current="page">Campaign</a>
+        <a class="app-nav__link" href="/welcome">Guide</a>
+        <a class="app-nav__link" href="/terms">Terms</a>
+        <a class="app-nav__link" id="adminLink" href="/admin" hidden>Admin</a>
+      </nav>
+      <div class="app-header__end">
         <span class="user-chip" id="userChip" hidden>
           <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
           <span class="user-email" id="userEmail"></span>
         </span>
-        <a class="text-btn" href="/welcome">Getting started</a>
-        <a class="text-btn" href="/terms">Sending terms</a>
-        <a class="text-btn" id="adminLink" href="/admin" hidden>Manage users</a>
-        <button type="button" class="text-btn" id="logoutBtn">Log out</button>
+        <button type="button" class="app-nav__link app-nav__link--button" id="logoutBtn">Log out</button>
       </div>
-    </header>
+    </div>
+  </header>
+
+  <main class="stage stage--app">
+    <div class="page-intro">
+      <h1 class="page-title">Campaign workspace</h1>
+      <p class="page-lead">Add people, write your message, then start sending.</p>
+    </div>
 
     <section class="workspace" aria-label="Campaign controls">
       <div class="panel">
@@ -173,7 +180,17 @@
           </div>
           <span class="log-follow">Following</span>
         </div>
-        <pre id="log" class="log"></pre>
+        <div class="log-body">
+          <div class="log-empty" id="logEmpty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 8v4l3 3" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+            <p class="log-empty-title">No activity yet</p>
+            <p class="log-empty-hint">Progress appears here when you start sending.</p>
+          </div>
+          <pre id="log" class="log"></pre>
+        </div>
       </aside>
     </section>
   </main>

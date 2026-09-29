@@ -23,6 +23,7 @@ const paceUsageEl = document.getElementById("paceUsage");
 const paceHintEl = document.getElementById("paceHint");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
+const logEmptyEl = document.getElementById("logEmpty");
 const pulseEl = document.getElementById("pulse");
 const saveBtn = document.getElementById("saveBtn");
 const runBtn = document.getElementById("runBtn");
@@ -597,6 +598,11 @@ function logLineClass(line) {
   return "log-line";
 }
 
+function syncLogEmpty() {
+  if (!logEmptyEl || !logEl) return;
+  logEmptyEl.hidden = logEl.childNodes.length > 0;
+}
+
 function appendLogs(lines) {
   if (!lines.length) return;
   const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 24;
@@ -608,6 +614,7 @@ function appendLogs(lines) {
     frag.appendChild(row);
   }
   logEl.appendChild(frag);
+  syncLogEmpty();
   if (atBottom) logEl.scrollTop = logEl.scrollHeight;
 }
 
@@ -662,6 +669,7 @@ async function launch() {
     }
     setStatus("Starting…", "running");
     logEl.replaceChildren();
+    syncLogEmpty();
     logCursor = 0;
     stopRequested = false;
     hadActiveJob = true;
@@ -833,4 +841,5 @@ async function boot() {
   }
 }
 
+syncLogEmpty();
 boot();

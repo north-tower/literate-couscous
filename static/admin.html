@@ -6,31 +6,39 @@
   <title>Manage users — Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-page">
+<body class="auth-page app-shell">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
-  <main class="stage admin-stage">
-    <header class="brand brand-glass">
-      <div class="brand-copy">
-        <div class="brand-lockup">
-          <span class="brand-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m22 2-7 20-4-9-9-4Z" />
-              <path d="M22 2 11 13" />
-            </svg>
-          </span>
-          <p class="brand-mark">Sendline</p>
-        </div>
-        <p class="brand-line">Invite people to send. Only one campaign uses Chrome at a time.</p>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand-lockup brand-lockup--link" href="/">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+          </svg>
+        </span>
+        <span class="brand-mark">Sendline</span>
+      </a>
+      <nav class="app-nav" aria-label="Primary">
+        <a class="app-nav__link" href="/">Campaign</a>
+        <a class="app-nav__link" href="/welcome">Guide</a>
+        <a class="app-nav__link" href="/terms">Terms</a>
+        <a class="app-nav__link is-active" href="/admin" aria-current="page">Admin</a>
+      </nav>
+      <div class="app-header__end">
+        <button type="button" class="app-nav__link app-nav__link--button" id="logoutBtn">Log out</button>
       </div>
-      <div class="brand-user">
-        <a class="text-btn" href="/welcome">Onboarding</a>
-        <a class="text-btn" href="/">Campaign</a>
-        <button type="button" class="text-btn" id="logoutBtn">Log out</button>
-      </div>
-    </header>
+    </div>
+  </header>
+
+  <main class="stage admin-stage stage--app">
+    <div class="page-intro">
+      <h1 class="page-title">Administration</h1>
+      <p class="page-lead">Invite users, manage Chrome queue, and configure residential exits.</p>
+    </div>
 
     <section class="admin-grid">
       <div class="card">

@@ -11,11 +11,28 @@
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand-lockup brand-lockup--link" href="/welcome">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+          </svg>
+        </span>
+        <span class="brand-mark">Sendline</span>
+      </a>
+      <nav class="app-nav" aria-label="Primary">
+        <a class="app-nav__link" id="backLink" href="/welcome">Guide</a>
+        <a class="app-nav__link is-active" href="/terms" aria-current="page">Terms</a>
+      </nav>
+      <div class="app-header__end">
+        <a class="btn primary btn--compact" href="/login">Log in</a>
+      </div>
+    </div>
+  </header>
+
   <main class="landing-stage">
-    <header class="landing-bar">
-      <p class="brand-mark">Sendline</p>
-      <a class="text-btn" id="backLink" href="/welcome">Getting started</a>
-    </header>
 
     <section class="landing-hero">
       <p class="landing-kicker">Sending terms</p>
