@@ -6,14 +6,15 @@
   <title>Getting started — Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-page landing-page">
+<body class="auth-page landing-page" data-nav-page="guide">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
-  <header class="app-header">
+  <div class="doc-column">
+  <header class="app-header app-header--doc">
     <div class="app-header__inner">
-      <a class="brand-lockup brand-lockup--link" href="/welcome">
+      <a class="brand-lockup brand-lockup--link" id="brandHomeLink" href="/welcome" data-href-guest="/welcome" data-href-user="/">
         <span class="brand-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m22 2-7 20-4-9-9-4Z" />
@@ -23,16 +24,23 @@
         <span class="brand-mark">Sendline</span>
       </a>
       <nav class="app-nav" aria-label="Primary">
-        <a class="app-nav__link is-active" href="/welcome" aria-current="page">Guide</a>
-        <a class="app-nav__link" href="/terms">Terms</a>
+        <a class="app-nav__link" id="navCampaign" href="/" hidden data-nav="campaign">Campaign</a>
+        <a class="app-nav__link is-active" href="/welcome" data-nav="guide">Guide</a>
+        <a class="app-nav__link" href="/terms" data-nav="terms">Terms</a>
+        <a class="app-nav__link" id="navAdmin" href="/admin" hidden data-nav="admin">Admin</a>
       </nav>
       <div class="app-header__end">
-        <a class="btn primary btn--compact" href="/login">Log in</a>
+        <span class="user-chip" id="headerUserChip" hidden>
+          <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
+          <span class="user-email" id="headerUserEmail"></span>
+        </span>
+        <a class="btn primary btn--compact" id="headerLoginBtn" href="/login">Log in</a>
+        <button type="button" class="app-nav__link app-nav__link--button" id="headerLogoutBtn" hidden>Log out</button>
       </div>
     </div>
   </header>
 
-  <main class="landing-stage">
+  <main class="landing-stage landing-stage--in-column">
 
     <section class="landing-hero">
       <p class="landing-kicker">Onboarding</p>
@@ -92,17 +100,12 @@
     </section>
 
     <div class="landing-cta">
-      <a class="btn primary" href="/login">Log in</a>
+      <a class="btn primary" id="ctaPrimaryGuest" href="/login">Log in</a>
+      <a class="btn primary" id="ctaPrimaryUser" href="/" hidden>Open campaign</a>
       <a class="text-btn" href="/terms">Sending terms</a>
-      <a class="text-btn" id="campaignLink" href="/" hidden>Open campaign</a>
     </div>
   </main>
-  <script>
-    fetch("/api/me", { credentials: "same-origin" })
-      .then((res) => {
-        if (res.ok) document.getElementById("campaignLink").hidden = false;
-      })
-      .catch(() => {});
-  </script>
+  </div>
+  <script src="/static/public-nav.js"></script>
 </body>
 </html>

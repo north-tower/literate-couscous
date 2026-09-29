@@ -242,6 +242,21 @@ def api_logout():
     return jsonify({"ok": True})
 
 
+@app.get("/api/session")
+def api_session():
+    """Public pages use this to adapt nav without requiring login."""
+    user = auth.current_user()
+    if user is None:
+        return jsonify({"ok": True, "authenticated": False})
+    return jsonify(
+        {
+            "ok": True,
+            "authenticated": True,
+            "user": auth.public_user(user),
+        }
+    )
+
+
 @app.get("/api/me")
 @auth.login_required
 def api_me():

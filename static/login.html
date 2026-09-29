@@ -6,48 +6,130 @@
   <title>Log in — Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-page">
+<body class="auth-page auth-page--login" data-nav-page="login">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
-  <main class="auth-stage">
-    <div class="auth-brand">
-      <span class="brand-icon brand-icon--lg" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m22 2-7 20-4-9-9-4Z" />
-          <path d="M22 2 11 13" />
-        </svg>
-      </span>
-      <p class="brand-mark">Sendline</p>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand-lockup brand-lockup--link" id="brandHomeLink" href="/welcome" data-href-guest="/welcome" data-href-user="/">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+          </svg>
+        </span>
+        <span class="brand-mark">Sendline</span>
+      </a>
+      <nav class="app-nav" aria-label="Primary">
+        <a class="app-nav__link" id="navCampaign" href="/" hidden data-nav="campaign">Campaign</a>
+        <a class="app-nav__link" href="/welcome" data-nav="guide">Guide</a>
+        <a class="app-nav__link" href="/terms" data-nav="terms">Terms</a>
+        <a class="app-nav__link" id="navAdmin" href="/admin" hidden data-nav="admin">Admin</a>
+      </nav>
+      <div class="app-header__end">
+        <span class="user-chip" id="headerUserChip" hidden>
+          <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
+          <span class="user-email" id="headerUserEmail"></span>
+        </span>
+        <a class="btn primary btn--compact" id="headerLoginBtn" href="/login">Log in</a>
+        <button type="button" class="app-nav__link app-nav__link--button" id="headerLogoutBtn" hidden>Log out</button>
+      </div>
     </div>
-    <p class="brand-line auth-tagline">Sign in to your workspace. Accounts are invite-only.</p>
-    <form class="card auth-card auth-card--glass" id="loginForm">
-      <div class="field compact">
-        <label class="input-label" for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" required />
-      </div>
-      <div class="field compact">
-        <label class="input-label" for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
-      </div>
-      <button type="submit" class="btn primary" id="loginBtn">
-        <span class="btn-label">Log in</span>
-      </button>
-      <p class="status" id="status" role="status"></p>
-    </form>
-    <p class="auth-aside"><a href="/welcome">New here? See how onboarding works</a></p>
+  </header>
+
+  <main class="auth-shell">
+    <section class="auth-panel" aria-labelledby="authPanelTitle">
+      <p class="landing-kicker">Invite-only workspace</p>
+      <h1 class="auth-panel-title" id="authPanelTitle">Sign in to your campaign</h1>
+      <p class="auth-panel-lead">Sendline runs on your operator’s machine. Sign in with the email and temporary password your admin sent you.</p>
+      <ul class="auth-trust">
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>
+          <span>No public sign-up — accounts are created by an admin</span>
+        </li>
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>
+          <span>Your people list and messages stay on your account</span>
+        </li>
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>
+          <span>LinkedIn credentials are encrypted on this server</span>
+        </li>
+      </ul>
+      <p class="auth-panel-foot">
+        First time here?
+        <a href="/welcome">Read the getting started guide</a>
+      </p>
+    </section>
+
+    <section class="auth-form-wrap" aria-labelledby="authFormTitle">
+      <form class="card auth-card" id="loginForm">
+        <header class="auth-card-head">
+          <h2 class="auth-card-title" id="authFormTitle">Log in</h2>
+          <p class="auth-card-sub">Use your invite email and password</p>
+        </header>
+
+        <div class="field compact">
+          <label class="input-label" for="email">Email</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+            </span>
+            <input id="email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required />
+          </div>
+        </div>
+
+        <div class="field compact">
+          <label class="input-label" for="password">Password</label>
+          <div class="input-wrap input-wrap--password">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Temporary password" required />
+            <button type="button" class="icon-btn input-reveal" id="togglePasswordBtn" aria-pressed="false" aria-controls="password" aria-label="Show password">
+              <svg class="icon-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg class="icon-eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2" />
+                <path d="M9.9 5.1A11 11 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-3.2 3.9" />
+                <path d="M6.1 6.1A18.2 18.2 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.2-.9" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn primary auth-submit" id="loginBtn">
+          <span class="btn-label">Continue to workspace</span>
+          <span class="btn-shine" aria-hidden="true"></span>
+        </button>
+        <p class="status" id="status" role="status"></p>
+      </form>
+    </section>
   </main>
 
   <script>
     const form = document.getElementById("loginForm");
     const statusEl = document.getElementById("status");
     const btn = document.getElementById("loginBtn");
+    const passwordEl = document.getElementById("password");
+    const togglePasswordBtn = document.getElementById("togglePasswordBtn");
+
+    togglePasswordBtn.addEventListener("click", () => {
+      const show = passwordEl.type === "password";
+      passwordEl.type = show ? "text" : "password";
+      togglePasswordBtn.setAttribute("aria-pressed", show ? "true" : "false");
+      togglePasswordBtn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       btn.disabled = true;
-      statusEl.className = "status";
+      statusEl.className = "status running";
       statusEl.textContent = "Signing in…";
       try {
         const res = await fetch("/api/login", {
@@ -55,7 +137,7 @@
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({
-            email: document.getElementById("email").value,
+            email: document.getElementById("email").value.trim(),
             password: document.getElementById("password").value,
           }),
         });
@@ -66,6 +148,8 @@
           btn.disabled = false;
           return;
         }
+        statusEl.className = "status ok";
+        statusEl.textContent = "Success — opening workspace…";
         window.location.href = "/";
       } catch (_) {
         statusEl.className = "status error";
@@ -74,5 +158,6 @@
       }
     });
   </script>
+  <script src="/static/public-nav.js"></script>
 </body>
 </html>
