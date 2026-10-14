@@ -6,13 +6,17 @@
   <title>Manage users — Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-page app-shell">
+<body class="auth-page app-shell user-signed-in">
   <div class="noise" aria-hidden="true"></div>
   <div class="orb orb-a" aria-hidden="true"></div>
   <div class="orb orb-b" aria-hidden="true"></div>
 
   <header class="app-header">
     <div class="app-header__inner">
+      <span class="user-chip" id="userChip" hidden>
+        <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
+        <span class="user-email" id="userEmail"></span>
+      </span>
       <a class="brand-lockup brand-lockup--link" href="/">
         <span class="brand-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

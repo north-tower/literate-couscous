@@ -13,6 +13,10 @@
 
   <header class="app-header">
     <div class="app-header__inner">
+      <span class="user-chip" id="userChip" hidden>
+        <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
+        <span class="user-email" id="userEmail"></span>
+      </span>
       <a class="brand-lockup brand-lockup--link" href="/">
         <span class="brand-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -29,10 +33,6 @@
         <a class="app-nav__link" id="adminLink" href="/admin" hidden>Admin</a>
       </nav>
       <div class="app-header__end">
-        <span class="user-chip" id="userChip" hidden>
-          <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
-          <span class="user-email" id="userEmail"></span>
-        </span>
         <button type="button" class="app-nav__link app-nav__link--button" id="logoutBtn">Log out</button>
       </div>
     </div>
@@ -48,6 +48,12 @@
       <div class="panel">
         <div class="panel-scroll">
         <div class="card" id="linkedinField">
+          <div class="linkedin-connected" id="linkedinConnectedView" hidden>
+            <span class="field-label">LinkedIn</span>
+            <span class="linkedin-connected-name" id="linkedinDisplayName"></span>
+            <button type="button" class="text-btn" id="linkedinEditBtn">Change</button>
+          </div>
+          <div class="linkedin-form" id="linkedinForm">
           <div class="field-head">
             <span class="field-label">Your LinkedIn login</span>
             <span class="meta tip" id="linkedinStatus">used to sign in</span>
@@ -78,6 +84,7 @@
             </div>
           </div>
           <p class="field-hint" id="linkedinHint">Saved encrypted on this server. Leave the password blank to keep the one already stored.</p>
+          </div>
         </div>
 
         <div class="card field" id="namesField">

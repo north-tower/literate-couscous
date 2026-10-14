@@ -33,6 +33,11 @@ const userAvatarEl = document.getElementById("userAvatar");
 const userEmailEl = document.getElementById("userEmail");
 const adminLinkEl = document.getElementById("adminLink");
 const logoutBtn = document.getElementById("logoutBtn");
+const linkedinField = document.getElementById("linkedinField");
+const linkedinForm = document.getElementById("linkedinForm");
+const linkedinConnectedView = document.getElementById("linkedinConnectedView");
+const linkedinDisplayNameEl = document.getElementById("linkedinDisplayName");
+const linkedinEditBtn = document.getElementById("linkedinEditBtn");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
 const TEMPLATE_NAME_HEADER = "name";
@@ -74,7 +79,24 @@ function parseNames(text) {
   return text
     .split(/\r?\n/)
     .map((n) => n.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((n) => !isTemplateNameHeader(n));
+}
+
+function userDisplayName(email) {
+  const value = String(email || "").trim();
+  if (!value) return "";
+  const local = value.split("@")[0] || value;
+  return local.replace(/[._-]+/g, " ").trim() || value;
+}
+
+function syncLinkedInFieldUi(forceForm = false) {
+  const username = (linkedinUsernameEl.value || "").trim();
+  const showSummary = !forceForm && linkedinConnected && Boolean(username);
+  if (linkedinField) linkedinField.classList.toggle("is-connected", showSummary);
+  if (linkedinConnectedView) linkedinConnectedView.hidden = !showSummary;
+  if (linkedinForm) linkedinForm.hidden = showSummary;
+  if (showSummary && linkedinDisplayNameEl) linkedinDisplayNameEl.textContent = username;
 }
 
 function updateCount() {
@@ -173,7 +195,7 @@ function setAttachmentUi() {
 }
 
 function applyConfig(cfg) {
-  namesEl.value = (cfg.people_names || []).join("\n");
+  namesEl.value = parseNames((cfg.people_names || []).join("\n")).join("\n");
   messageEl.value = cfg.message_template || "";
   linkedinUsernameEl.value = cfg.linkedin_username || "";
   linkedinPasswordEl.value = "";
@@ -182,6 +204,7 @@ function applyConfig(cfg) {
   if (linkedinStatusEl) {
     linkedinStatusEl.textContent = linkedinConnected ? "saved" : "used to sign in";
   }
+  syncLinkedInFieldUi(false);
   attachmentPath = cfg.attachment_path || null;
   attachmentName = cfg.attachment_name || fileNameFromPath(attachmentPath) || null;
   rememberSendHistory(cfg.send_history);
@@ -733,6 +756,13 @@ togglePasswordBtn.addEventListener("click", () => {
   if (label) label.textContent = show ? "Hide" : "Show";
 });
 
+if (linkedinEditBtn) {
+  linkedinEditBtn.addEventListener("click", () => {
+    syncLinkedInFieldUi(true);
+    linkedinUsernameEl.focus();
+  });
+}
+
 uploadNamesBtn.addEventListener("click", () => namesFileEl.click());
 namesFileEl.addEventListener("change", () => {
   const file = namesFileEl.files && namesFileEl.files[0];
@@ -801,13 +831,14 @@ async function boot() {
     const meData = await meRes.json();
     if (meData.user) {
       const email = meData.user.email || "";
-      userEmailEl.textContent = email;
+      const displayName = userDisplayName(email);
+      userEmailEl.textContent = displayName || email;
       if (email && userChipEl) {
         userChipEl.hidden = false;
-        if (userAvatarEl) {
-          userAvatarEl.textContent = email.charAt(0).toUpperCase();
-        }
+        userChipEl.classList.add("user-chip--name-only");
+        if (userAvatarEl) userAvatarEl.hidden = true;
       }
+      document.body.classList.add("user-signed-in");
       adminLinkEl.hidden = meData.user.role !== "admin";
     }
     await loadConfig();

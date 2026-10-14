@@ -15,6 +15,10 @@
   <div class="landing-shell">
     <header class="app-header app-header--doc app-header--landing">
       <div class="app-header__inner">
+        <span class="user-chip" id="headerUserChip" hidden>
+          <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
+          <span class="user-email" id="headerUserEmail"></span>
+        </span>
         <a class="brand-lockup brand-lockup--link" id="brandHomeLink" href="/welcome" data-href-guest="/welcome" data-href-user="/">
           <span class="brand-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -31,10 +35,6 @@
           <a class="app-nav__link" id="navAdmin" href="/admin" hidden data-nav="admin">Admin</a>
         </nav>
         <div class="app-header__end">
-          <span class="user-chip" id="headerUserChip" hidden>
-            <span class="user-avatar" id="headerUserAvatar" aria-hidden="true"></span>
-            <span class="user-email" id="headerUserEmail"></span>
-          </span>
           <a class="btn primary btn--compact" id="headerLoginBtn" href="/login">Log in</a>
           <button type="button" class="app-nav__link app-nav__link--button" id="headerLogoutBtn" hidden>Log out</button>
         </div>

@@ -229,5 +229,33 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   window.location.href = "/login";
 });
 
+function userDisplayName(email) {
+  const value = String(email || "").trim();
+  if (!value) return "";
+  const local = value.split("@")[0] || value;
+  return local.replace(/[._-]+/g, " ").trim() || value;
+}
+
+async function loadSessionUser() {
+  const userChipEl = document.getElementById("userChip");
+  const userAvatarEl = document.getElementById("userAvatar");
+  const userEmailEl = document.getElementById("userEmail");
+  try {
+    const res = await api("/api/me");
+    const data = await res.json();
+    if (!data.user || !userEmailEl) return;
+    const email = data.user.email || "";
+    userEmailEl.textContent = userDisplayName(email) || email;
+    if (email && userChipEl) {
+      userChipEl.hidden = false;
+      userChipEl.classList.add("user-chip--name-only");
+      if (userAvatarEl) userAvatarEl.hidden = true;
+    }
+  } catch (_) {
+    /* redirect handled in api() */
+  }
+}
+
+loadSessionUser();
 loadAdmin().catch(() => setStatus("Could not load admin data", "error"));
 setInterval(() => loadAdmin().catch(() => {}), 4000);

@@ -276,6 +276,31 @@ body.app-shell {
   flex-shrink: 0;
 }
 
+/* Signed in: compact bar — name, nav links, log out (no Sendline lockup) */
+body.user-signed-in .brand-lockup {
+  display: none;
+}
+
+body.user-signed-in.app-shell .page-intro {
+  display: none;
+}
+
+body.user-signed-in .app-header__inner {
+  flex-wrap: nowrap;
+  gap: 0.35rem 0.55rem;
+}
+
+body.user-signed-in .app-nav {
+  margin-left: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.user-signed-in .user-chip:not([hidden]) {
+  flex-shrink: 1;
+  max-width: min(14rem, 34vw);
+}
+
 .btn--compact {
   min-width: 0;
   padding: 0.48rem 0.95rem;
@@ -462,6 +487,32 @@ body.app-shell .stage--app {
   font-weight: 700;
   color: #f0fdfa;
   background: linear-gradient(145deg, var(--accent), var(--accent-deep));
+}
+
+.user-chip--name-only {
+  padding: 0.28rem 0.65rem;
+}
+
+.user-chip--name-only .user-avatar {
+  display: none;
+}
+
+.linkedin-connected {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+}
+
+.linkedin-connected-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+#linkedinField.is-connected .linkedin-form {
+  display: none;
 }
 
 .user-email {
@@ -1275,6 +1326,10 @@ input:disabled {
     flex-wrap: wrap;
   }
 
+  body.user-signed-in .app-header__inner {
+    flex-wrap: nowrap;
+  }
+
   .app-nav {
     order: 3;
     flex: 1 1 100%;
@@ -1282,6 +1337,12 @@ input:disabled {
     padding-top: 0.15rem;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  body.user-signed-in .app-nav {
+    order: 0;
+    flex: 1 1 auto;
+    padding-top: 0;
   }
 
   .actions {

@@ -19,6 +19,13 @@
   const ctaBandGuest = document.getElementById("ctaBandGuest");
   const ctaBandUser = document.getElementById("ctaBandUser");
 
+  function userDisplayName(email) {
+    const value = String(email || "").trim();
+    if (!value) return "";
+    const local = value.split("@")[0] || value;
+    return local.replace(/[._-]+/g, " ").trim() || value;
+  }
+
   function setNavCurrent() {
     const links = document.querySelectorAll(".app-nav [data-nav]");
     links.forEach((el) => {
@@ -36,7 +43,11 @@
     if (navAdmin) navAdmin.hidden = true;
     if (headerLoginBtn) headerLoginBtn.hidden = page === "login";
     if (headerLogoutBtn) headerLogoutBtn.hidden = true;
-    if (headerUserChip) headerUserChip.hidden = true;
+    if (headerUserChip) {
+      headerUserChip.hidden = true;
+      headerUserChip.classList.remove("user-chip--name-only");
+    }
+    if (headerUserAvatar) headerUserAvatar.hidden = false;
     if (ctaPrimaryGuest) ctaPrimaryGuest.hidden = false;
     if (ctaPrimaryUser) ctaPrimaryUser.hidden = true;
     if (ctaBandGuest) ctaBandGuest.hidden = false;
@@ -53,11 +64,11 @@
     if (headerLogoutBtn) headerLogoutBtn.hidden = false;
     if (headerUserChip && headerUserEmail) {
       const email = user.email || "";
-      headerUserEmail.textContent = email;
+      const displayName = userDisplayName(email);
+      headerUserEmail.textContent = displayName || email;
       headerUserChip.hidden = !email;
-      if (headerUserAvatar && email) {
-        headerUserAvatar.textContent = email.charAt(0).toUpperCase();
-      }
+      headerUserChip.classList.add("user-chip--name-only");
+      if (headerUserAvatar) headerUserAvatar.hidden = true;
     }
     if (ctaPrimaryGuest) ctaPrimaryGuest.hidden = true;
     if (ctaPrimaryUser) ctaPrimaryUser.hidden = false;
