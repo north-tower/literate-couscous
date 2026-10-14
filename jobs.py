@@ -185,7 +185,6 @@ def _write_job_payload(user_id: int, job_id: int) -> None:
                 "people_names": campaign["people_names"],
                 "message_template": campaign["message_template"],
                 "attachment_path": campaign.get("attachment_path"),
-                "pace_preset": pace.normalize(campaign.get("pace_preset")),
                 "ledger_path": str(pace.ledger_path(db.user_dir(user_id))),
             },
             indent=2,

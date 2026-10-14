@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sending terms — Sendline</title>
+  <title>Sending behavior — Sendline</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body class="auth-page landing-page landing-page--terms" data-nav-page="terms">
@@ -43,68 +43,30 @@
   <main class="landing-stage landing-stage--in-column">
 
     <section class="landing-hero">
-      <p class="landing-kicker">Sending terms</p>
-      <h1>How fast Sendline is allowed to send</h1>
-      <p>LinkedIn does not publish a safe number of ordinary messages per day. Accounts get restricted when too many messages go out too quickly. These are the caps Sendline enforces so a long list is spread across days.</p>
-      <p class="landing-rule">
-        <svg class="landing-rule-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-          <path d="M12 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          <circle cx="12" cy="8" r="1.1" fill="currentColor" />
-        </svg>
-        <span>Careful is the default. Use Established account only for an older LinkedIn login that already messages people in the normal course of work.</span>
-      </p>
+      <p class="landing-kicker">Sending behavior</p>
+      <h1>How Sendline sends messages</h1>
+      <p>Sendline does not enforce daily or weekly caps. Each message is composed and sent the way a person would: open a new message, find the recipient, type the text, send, then pause before the next person.</p>
     </section>
 
     <section class="card landing-note">
-      <h2>The two paces</h2>
-      <div class="terms-table-wrap">
-        <table class="terms-table">
-          <thead>
-            <tr>
-              <th scope="col">Limit</th>
-              <th scope="col">Careful</th>
-              <th scope="col">Established account</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Per day</th>
-              <td>20</td>
-              <td>35</td>
-            </tr>
-            <tr>
-              <th scope="row">Per week</th>
-              <td>80</td>
-              <td>120</td>
-            </tr>
-            <tr>
-              <th scope="row">Per hour</th>
-              <td>8</td>
-              <td>12</td>
-            </tr>
-            <tr>
-              <th scope="row">Gap between messages</th>
-              <td>2–4 minutes</td>
-              <td>About 1.5–3 minutes</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The day resets at local midnight. The week resets on Monday at local midnight. The hour is a rolling hour, not the clock hour. The gap is a random wait inside that range, so messages are not sent on a fixed beat.</p>
+      <h2>What the worker does</h2>
+      <p>Opens LinkedIn’s new-message window for each person on your list.</p>
+      <p>Types the recipient name at human speed, then selects the match.</p>
+      <p>Types your template (with <code>{name}</code> filled in) character by character — not instant paste.</p>
+      <p>Waits a moment, clicks Send, then pauses roughly 16–42 seconds before starting the next person.</p>
+      <p>Long lists run until you stop the campaign or LinkedIn shows an account restriction. Sendline does not automatically stop with a “come back tomorrow” message.</p>
     </section>
 
     <section class="card landing-note">
-      <h2>What happens on a long list</h2>
-      <p>Sendline sends until the next message would pass a cap, then closes Chrome and stops. The log says when sending can continue. Press Start again after that time. People already messaged in the last 90 days are skipped, so the same list continues instead of sending twice.</p>
-      <p>If the hourly cap is hit and the next message is less than 20 minutes away, the run waits and then continues. If the wait is longer, Chrome closes so the session is not left open.</p>
-      <p>A message that does not send does not count toward the caps. If LinkedIn shows an account limit, the run stops immediately.</p>
+      <h2>90-day memory</h2>
+      <p>When a message sends successfully, that person is recorded for 90 days. Re-running the same list skips anyone already messaged in that window so you do not double-send.</p>
+      <p>Failed or skipped attempts do not count toward that memory.</p>
     </section>
 
     <section class="card landing-note">
-      <h2>What these terms do not do</h2>
-      <p>LinkedIn’s weekly invitation limit is a separate control, and it varies by account. These caps cover ordinary messages only.</p>
-      <p>Slowing the run lowers the chance of a restriction. It does not make automated messaging allowed under LinkedIn’s User Agreement, and it does not guarantee an account will stay unrestricted.</p>
+      <h2>LinkedIn limits</h2>
+      <p>LinkedIn may still restrict an account if activity looks automated or too heavy. If Sendline detects a limit message in Chrome, the run stops immediately.</p>
+      <p>Slower, human-like sending reduces risk but does not guarantee compliance with LinkedIn’s User Agreement.</p>
     </section>
 
     <div class="landing-cta">

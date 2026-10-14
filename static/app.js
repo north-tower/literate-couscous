@@ -19,8 +19,8 @@ const attachmentProgress = document.getElementById("attachmentProgress");
 const attachmentProgressFill = document.getElementById("attachmentProgressFill");
 const attachmentProgressLabel = document.getElementById("attachmentProgressLabel");
 const nameCountEl = document.getElementById("nameCount");
-const paceUsageEl = document.getElementById("paceUsage");
-const paceHintEl = document.getElementById("paceHint");
+const sendHistoryMetaEl = document.getElementById("sendHistoryMeta");
+const sendStyleHintEl = document.getElementById("sendStyleHint");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 const logEmptyEl = document.getElementById("logEmpty");
@@ -82,46 +82,40 @@ function updateCount() {
   const label = n === 1 ? "1 person" : n + " people";
   nameCountEl.textContent = label;
   nameCountEl.title = n === 1 ? "1 person loaded" : n + " people loaded";
-  updatePaceSummary();
+  updateSendHistorySummary();
 }
 
-const PACE = {
-  careful: { daily: 20, weekly: 80 },
-  established: { daily: 35, weekly: 120 },
-};
+let recentNames = [];
 
-let paceRecent = [];
-let paceCounts = { today: 0, week: 0 };
-
-function selectedPace() {
-  const checked = document.querySelector('input[name="pace"]:checked');
-  const value = checked ? checked.value : "careful";
-  return PACE[value] ? value : "careful";
+function rememberSendHistory(history) {
+  if (!history) return;
+  recentNames = Array.isArray(history.recent_names) ? history.recent_names : [];
+  updateSendHistorySummary();
 }
 
-function rememberPace(pace) {
-  if (!pace) return;
-  paceCounts = { today: Number(pace.today) || 0, week: Number(pace.week) || 0 };
-  paceRecent = Array.isArray(pace.recent_names) ? pace.recent_names : [];
-  updatePaceSummary();
-}
-
-function updatePaceSummary() {
-  if (!paceUsageEl) return;
-  const preset = PACE[selectedPace()];
+function updateSendHistorySummary() {
   const names = parseNames(namesEl.value);
-  const recent = new Set(paceRecent);
-  const left = names.filter((name) => !recent.has(String(name).trim().toLowerCase())).length;
-  const days = left ? Math.ceil(left / preset.daily) : 0;
-  paceUsageEl.textContent = "Today " + paceCounts.today + "/" + preset.daily + " · week " + paceCounts.week + "/" + preset.weekly;
-  if (!paceHintEl) return;
-  const daysLabel = days === 1 ? "1 day" : days + " days";
-  const queue = left
-    ? left + " not messaged in the last 90 days — about " + daysLabel + " at this pace. "
-    : "Everyone on this list was messaged in the last 90 days. ";
-  paceHintEl.textContent =
-    queue +
-    "LinkedIn can still limit the account. Press Start again after a cap and people already messaged are skipped.";
+  const recent = new Set(recentNames);
+  const skipped = names.filter((name) => recent.has(String(name).trim().toLowerCase())).length;
+  const left = names.length - skipped;
+  if (sendHistoryMetaEl) {
+    sendHistoryMetaEl.textContent =
+      skipped === 1 ? "1 will be skipped (90-day memory)" : skipped + " will be skipped (90-day memory)";
+  }
+  if (!sendStyleHintEl) return;
+  if (!names.length) {
+    sendStyleHintEl.textContent =
+      "Each person gets a new message: the worker types the text like a human, sends, pauses, then moves to the next.";
+    return;
+  }
+  const leftLabel = left === 1 ? "1 person" : left + " people";
+  sendStyleHintEl.textContent =
+    left
+      ? leftLabel +
+        " left to message on this run (" +
+        skipped +
+        " skipped — already messaged in the last 90 days). Sending is slow and manual-looking on purpose."
+      : "Everyone on this list was messaged in the last 90 days — add names or wait for the memory to expire.";
 }
 
 function setStatus(text, kind = "") {
@@ -162,7 +156,6 @@ function payloadFromForm() {
     linkedin_password: linkedinPasswordEl.value || "",
     attachment_path: attachmentPath,
     attachment_name: attachmentName,
-    pace_preset: selectedPace(),
   };
 }
 
@@ -191,10 +184,7 @@ function applyConfig(cfg) {
   }
   attachmentPath = cfg.attachment_path || null;
   attachmentName = cfg.attachment_name || fileNameFromPath(attachmentPath) || null;
-  const preset = cfg.pace_preset || (cfg.pace && cfg.pace.preset) || "careful";
-  const paceInput = document.querySelector('input[name="pace"][value="' + preset + '"]');
-  if (paceInput) paceInput.checked = true;
-  rememberPace(cfg.pace);
+  rememberSendHistory(cfg.send_history);
   setAttachmentUi();
   updateCount();
 }
@@ -540,9 +530,6 @@ function setRunningUi(active) {
   linkedinUsernameEl.disabled = active;
   linkedinPasswordEl.disabled = active;
   togglePasswordBtn.disabled = active;
-  document.querySelectorAll('input[name="pace"]').forEach((input) => {
-    input.disabled = active;
-  });
   if (!active) stopBtn.disabled = false;
   if (active) pulseEl.dataset.state = "running";
 }
@@ -587,7 +574,6 @@ function logLineClass(line) {
     t.includes("did not stop in time") ||
     t.includes("exit 1") ||
     t.includes("exit 75") ||
-    t.includes("pace reached") ||
     t.includes("account limit")
   ) {
     return "log-line log-line--warn";
@@ -624,7 +610,7 @@ async function pollLogs() {
     const data = await res.json();
     appendLogs(data.lines || []);
     logCursor = data.next ?? logCursor;
-    if (data.pace) rememberPace(data.pace);
+    if (data.send_history) rememberSendHistory(data.send_history);
     const state = applyJobState(data);
     if (!state.active) {
       clearInterval(pollTimer);
@@ -633,7 +619,7 @@ async function pollLogs() {
       const code = data.exit_code;
       if (data.job_status === "paused") {
         pulseEl.dataset.state = "stopped";
-        setStatus(data.pace_note || "Pace limit reached. Start again later — already-messaged people are skipped.", "stopped");
+        setStatus(data.limit_note || "LinkedIn showed an account limit, so sending stopped.", "stopped");
       } else if (code === 0 || data.job_status === "done") {
         pulseEl.dataset.state = "done";
         setStatus("Sending finished successfully", "ok");
@@ -734,9 +720,6 @@ async function stop() {
 }
 
 namesEl.addEventListener("input", updateCount);
-document.querySelectorAll('input[name="pace"]').forEach((input) => {
-  input.addEventListener("change", updatePaceSummary);
-});
 saveBtn.addEventListener("click", () => saveConfig(false));
 runBtn.addEventListener("click", launch);
 stopBtn.addEventListener("click", stop);

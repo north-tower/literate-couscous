@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from typing import Any, Iterable
 
-import pace
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -247,7 +246,6 @@ def get_campaign(user_id: int) -> dict[str, Any]:
         "message_template": (row or {}).get("message_template") or "",
         "attachment_path": (row or {}).get("attachment_path"),
         "attachment_name": (row or {}).get("attachment_name"),
-        "pace_preset": pace.normalize((row or {}).get("pace_preset")),
     }
 
 
@@ -258,20 +256,18 @@ def upsert_campaign(
     message_template: str | None = None,
     attachment_path: str | None | object = Ellipsis,
     attachment_name: str | None | object = Ellipsis,
-    pace_preset: str | None = None,
 ) -> dict[str, Any]:
     current = get_campaign(user_id)
     names = people_names if people_names is not None else current["people_names"]
     template = current["message_template"] if message_template is None else message_template
     att_path = current["attachment_path"] if attachment_path is Ellipsis else attachment_path
     att_name = current["attachment_name"] if attachment_name is Ellipsis else attachment_name
-    preset = pace.normalize(current["pace_preset"] if pace_preset is None else pace_preset)
     execute(
         """UPDATE campaigns
            SET people_names_json = ?, message_template = ?, attachment_path = ?,
-               attachment_name = ?, pace_preset = ?, updated_at = ?
+               attachment_name = ?, updated_at = ?
            WHERE user_id = ?""",
-        (json.dumps(names, ensure_ascii=False), template, att_path, att_name, preset, time.time(), user_id),
+        (json.dumps(names, ensure_ascii=False), template, att_path, att_name, time.time(), user_id),
     )
     return get_campaign(user_id)
 

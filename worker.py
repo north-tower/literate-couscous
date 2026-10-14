@@ -2,14 +2,13 @@
 import argparse
 import json
 import os
+import random
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Iterable, Optional
-
-import pyperclip
 
 import egress
 import pace
@@ -40,14 +39,21 @@ PROXY_LOCAL_PORT: int | None = None
 # =========================
 TIMEOUTS = {"page": 40, "ui": 30, "short": 10}
 SLEEPS = {
-    "pre_message_page": 4.0,
-    "after_name_type": 5.0,
-    "after_enter": 0.7,
-    "after_click_editor": 0.3,
-    "after_paste": 3.0,
-    "after_attach": 3.0,
-    "after_send": 3.0,
+    "pre_message_page": (2.5, 4.5),
+    "after_recipient_enter": (0.8, 1.6),
+    "after_click_editor": (0.35, 0.85),
+    "after_attach": (2.0, 4.0),
+    "after_send": (1.2, 2.5),
+    "before_send_click": (0.4, 1.1),
 }
+
+
+def _human_sleep(range_or_seconds: float | tuple[float, float]) -> None:
+    if isinstance(range_or_seconds, tuple):
+        seconds = random.uniform(range_or_seconds[0], range_or_seconds[1])
+    else:
+        seconds = float(range_or_seconds)
+    interruptible_sleep(seconds)
 
 SELECTORS = {
     "login_username": [
@@ -119,12 +125,11 @@ class StopRequested(Exception):
     """User clicked Stop in the UI (or Ctrl+C)."""
 
 
-class PaceStop(Exception):
-    """Daily, weekly, or hourly cap — or LinkedIn is showing an account limit."""
+class LinkedInLimitStop(Exception):
+    """LinkedIn is showing an account restriction."""
 
-    def __init__(self, outcome: str, log_message: str, note: str):
+    def __init__(self, log_message: str, note: str):
         super().__init__(log_message)
-        self.outcome = outcome
         self.note = note
 
 
@@ -151,6 +156,15 @@ def clear_stop_flag() -> None:
 
 def should_stop() -> bool:
     return _stop_flag().is_file()
+
+
+def type_like_human(el, text: str) -> None:
+    """Type text with variable per-character delays."""
+    for ch in text:
+        if should_stop():
+            raise StopRequested()
+        el.send_keys(ch)
+        interruptible_sleep(pace.char_typing_delay(ch))
 
 
 def interruptible_sleep(seconds: float) -> None:
@@ -311,45 +325,15 @@ def close_attachment_upload_box() -> None:
     interruptible_sleep(0.4)
     print("Attachment box closed.")
 
-def paste_message_via_clipboard(driver, el, text: str) -> bool:
-    """
-    Robust paste: copy to OS clipboard, Ctrl+V into editor, verify text exists.
-    Returns True if editor has text after paste.
-    """
-    # Put text on OS clipboard
-    pyperclip.copy(text)
-
-    # Move focus & click editor
-    scroll_into_view(driver, el)
-    click_js(driver, el)
-    interruptible_sleep(0.1)
-
-    # Send Ctrl+V (real paste)
-    actions = ActionChains(driver)
-    actions.move_to_element(el).click(el).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-    interruptible_sleep(SLEEPS["after_paste"])
-
-    # Nudge with a real keystroke so frameworks flip state
-    try:
-        el.send_keys(" ")
-        el.send_keys(Keys.BACKSPACE)
-    except Exception:
-        pass
-
-    # Check if editor now has visible text
-    return editor_text_len(driver, el) > 0
-
-def fallback_type_like_human(driver, el, text: str):
-    """
-    Slow, human-like typing as an ultimate fallback.
-    """
-    actions = ActionChains(driver)
-    actions.move_to_element(el).click(el).perform()
-    for chunk in text.split("\n"):
-        if chunk:
-            actions.send_keys(chunk).perform()
-        actions.key_down(Keys.SHIFT).send_keys(Keys.ENTER).key_up(Keys.SHIFT).perform()  # newline without sending
-        interruptible_sleep(0.05)
+def type_multiline_like_human(el, text: str) -> None:
+    """Type a message in the editor, including line breaks."""
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        if line:
+            type_like_human(el, line)
+        if index + 1 < len(lines):
+            el.send_keys(Keys.SHIFT, Keys.ENTER)
+            interruptible_sleep(random.uniform(0.15, 0.45))
 
 # =========================
 # Browser setup — per-user --user-data-dir. Never taskkill all Chrome.
@@ -610,11 +594,10 @@ def load_job_config():
             proxy_url = raw_proxy.strip()
     finally:
         _delete_secrets_file(secrets_path)
-    preset = pace.normalize(data.get("pace_preset"))
     ledger = data.get("ledger_path")
     ledger_path = Path(str(ledger)) if isinstance(ledger, str) and ledger.strip() else pace.ledger_path(JOB_DIR)
     print(f"Loaded job ({len(names)} people).")
-    return names, template, attachment, email, password, preset, ledger_path, proxy_url
+    return names, template, attachment, email, password, ledger_path, proxy_url
 
 
 # =========================
@@ -733,8 +716,7 @@ def _raise_if_linkedin_limited() -> None:
     phrase = linkedin_limit_message()
     if not phrase:
         return
-    raise PaceStop(
-        "restricted",
+    raise LinkedInLimitStop(
         "LinkedIn is showing an account limit (" + phrase + "). Stopped so this account is not pushed further.",
         "LinkedIn showed an account limit, so sending stopped.",
     )
@@ -801,7 +783,7 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         raise StopRequested()
     driver.get("https://www.linkedin.com/messaging/thread/new/")
     print("Opening new message window...")
-    interruptible_sleep(SLEEPS["pre_message_page"])
+    _human_sleep(SLEEPS["pre_message_page"])
     _raise_if_linkedin_limited()
 
     # Select recipient via Enter (top suggestion)
@@ -809,10 +791,11 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         search_bar = wait_for_any(driver, SELECTORS["typeahead_input"], EC.visibility_of_element_located, TIMEOUTS["ui"])
         search_bar.send_keys(Keys.CONTROL, "a")
         search_bar.send_keys(Keys.DELETE)
-        search_bar.send_keys(person_name)
-        interruptible_sleep(SLEEPS["after_name_type"])
+        interruptible_sleep(random.uniform(0.2, 0.5))
+        type_like_human(search_bar, person_name)
+        interruptible_sleep(random.uniform(0.6, 1.4))
         search_bar.send_keys(Keys.ENTER)
-        interruptible_sleep(SLEEPS["after_enter"])
+        _human_sleep(SLEEPS["after_recipient_enter"])
         try:
             wait_for_any(driver, SELECTORS["recipient_chip_any"], EC.presence_of_element_located, 3)
             print(f"Selected {person_name}.")
@@ -827,12 +810,10 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
         message_box = wait_for_any(driver, SELECTORS["editor"], EC.visibility_of_element_located, TIMEOUTS["ui"])
         scroll_into_view(driver, message_box)
         click_js(driver, message_box)
-        interruptible_sleep(SLEEPS["after_click_editor"])
+        _human_sleep(SLEEPS["after_click_editor"])
 
-        # Paste message via OS clipboard -> Ctrl+V. If that fails, type like a human.
-        if not paste_message_via_clipboard(driver, message_box, message):
-            print("[INFO] Clipboard paste not detected; typing message slowly.")
-            fallback_type_like_human(driver, message_box, message)
+        print("Typing message…")
+        type_multiline_like_human(message_box, message)
 
         # Verify there is content before proceeding (turns editor white)
         if editor_text_len(driver, message_box) == 0:
@@ -871,20 +852,21 @@ def start_new_chat_and_send_message(person_name: str, message: str, attachment_p
                 pass
             print("File attached.")
             wait_for_attachment_preview()
-            interruptible_sleep(SLEEPS["after_attach"])
+            _human_sleep(SLEEPS["after_attach"])
             close_attachment_upload_box()
         else:
             print("No attachment path provided; sending text only.")
 
         # Send
+        _human_sleep(SLEEPS["before_send_click"])
         send_button = wait_for_any(driver, SELECTORS["send_button"], EC.element_to_be_clickable, TIMEOUTS["ui"])
         scroll_into_view(driver, send_button)
         click_js(driver, send_button)
         print(f"Message and attachment (if any) sent to {person_name}.")
-        interruptible_sleep(SLEEPS["after_send"])
+        _human_sleep(SLEEPS["after_send"])
         return "sent"
 
-    except PaceStop:
+    except LinkedInLimitStop:
         raise
     except (TimeoutException, NoSuchElementException, ElementClickInterceptedException) as e:
         print(f"Failed to send the message to {person_name}: {e}")
@@ -911,39 +893,15 @@ def configure(*, job_dir: Path, user_data_dir: Path, debug_port: int) -> None:
     USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _write_pace_result(outcome: str, note: str) -> None:
+def _write_limit_result(note: str) -> None:
     if JOB_DIR is None:
         return
-    path = JOB_DIR / "pace_result.json"
-    payload = {"outcome": outcome, "note": note}
+    path = JOB_DIR / "limit_result.json"
+    payload = {"note": note}
     try:
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
-        print(f"[WARN] Could not save pace result: {exc}")
-
-
-def _pace_stop(decision: pace.Decision, left: int) -> None:
-    message = decision.log_message
-    if left > 0:
-        message = message.rstrip(".") + f". {left} people are still on the list."
-    raise PaceStop(decision.outcome, message, decision.note)
-
-
-def _wait_until_send_allowed(sends: list, limits: pace.Limits, left: int, *, check_page: bool) -> list:
-    """Sleep through a short hourly wait. Stop the run if a longer cap is full."""
-    while True:
-        if should_stop():
-            raise StopRequested()
-        if check_page:
-            _raise_if_linkedin_limited()
-        decision = pace.decide(sends, time.time(), limits)
-        if decision.action == "send":
-            return sends
-        if decision.action == "wait":
-            print(decision.log_message)
-            interruptible_sleep(decision.seconds)
-            continue
-        _pace_stop(decision, left)
+        print(f"[WARN] Could not save limit result: {exc}")
 
 
 if __name__ == "__main__":
@@ -952,7 +910,7 @@ if __name__ == "__main__":
 
     clear_stop_flag()
     stopped = False
-    pace_code = 0
+    limit_code = 0
     browser_started = False
     try:
         (
@@ -961,11 +919,9 @@ if __name__ == "__main__":
             run_attachment,
             run_email,
             run_password,
-            run_preset,
             run_ledger,
             run_proxy,
         ) = load_job_config()
-        limits = pace.limits_for(run_preset)
         sends = pace.load_sends(run_ledger)
 
         pending: list[str] = []
@@ -977,15 +933,11 @@ if __name__ == "__main__":
                 continue
             pending.append(full_name)
 
-        print(
-            f"Pace: {limits.label}. Up to {limits.daily}/day and {limits.weekly}/week, "
-            f"with {limits.min_gap // 60}–{limits.max_gap // 60} minutes between messages."
-        )
+        print("Sending one person at a time — typing each message and pausing between people.")
         if not pending:
             print("Everyone on this list was already messaged in the last 90 days.")
         else:
             print(f"{len(pending)} people left after skipping recent messages.")
-            sends = _wait_until_send_allowed(sends, limits, len(pending), check_page=False)
             if run_proxy:
                 start_residential_proxy(run_proxy)
             browser_started = True
@@ -995,28 +947,26 @@ if __name__ == "__main__":
         for index, full_name in enumerate(pending):
             if should_stop():
                 raise StopRequested()
-            sends = _wait_until_send_allowed(sends, limits, len(pending) - index, check_page=True)
+            _raise_if_linkedin_limited()
             first_name = full_name.split()[0]
             msg = run_template.format(name=first_name)
             outcome = start_new_chat_and_send_message(full_name, msg, run_attachment)
             if outcome != "sent":
-                interruptible_sleep(8)
+                interruptible_sleep(random.uniform(6.0, 12.0))
                 continue
-            sends = pace.append_send(run_ledger, full_name)
+            pace.append_send(run_ledger, full_name)
             if index + 1 >= len(pending):
                 break
-            gap = pace.wait_after_send(sends, time.time(), limits)
-            if gap.action == "stop":
-                _pace_stop(gap, len(pending) - index - 1)
-            print(gap.log_message)
-            interruptible_sleep(gap.seconds)
+            pause_seconds, pause_msg = pace.pause_between_people()
+            print(pause_msg)
+            interruptible_sleep(pause_seconds)
     except egress.EgressError as exc:
         print(str(exc))
-        pace_code = 1
-    except PaceStop as exc:
+        limit_code = 1
+    except LinkedInLimitStop as exc:
         print(str(exc))
-        _write_pace_result(exc.outcome, exc.note)
-        pace_code = 75
+        _write_limit_result(exc.note)
+        limit_code = 75
     except StopRequested:
         print("Stop requested — closing Chrome.")
         stopped = True
@@ -1033,7 +983,7 @@ if __name__ == "__main__":
         except OSError:
             pass
         clear_stop_flag()
-    if pace_code:
-        sys.exit(pace_code)
+    if limit_code:
+        sys.exit(limit_code)
     if stopped:
         sys.exit(130)

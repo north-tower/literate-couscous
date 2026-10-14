@@ -1,83 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Sending pace for LinkedIn campaigns.
-
-LinkedIn does not publish a quota for ordinary messages. Weekly invitation
-limits are a separate control and vary by account. These caps only slow a
-long list so one run cannot fire every message at once. They do not make
-automation compliant with LinkedIn's User Agreement, and they do not
-guarantee an account stays unrestricted.
-"""
+"""Send ledger (dedupe) and human-like pauses between LinkedIn messages."""
 from __future__ import annotations
 
 import json
 import random
 import time
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 RETENTION_DAYS = 90
-MAX_IN_RUN_WAIT = 20 * 60
 
-_PRESETS = {
-    "careful": {
-        "label": "Careful",
-        "min_gap": 120,
-        "max_gap": 240,
-        "hourly": 8,
-        "daily": 20,
-        "weekly": 80,
-    },
-    "established": {
-        "label": "Established account",
-        "min_gap": 90,
-        "max_gap": 180,
-        "hourly": 12,
-        "daily": 35,
-        "weekly": 120,
-    },
-}
+# Typing speed (~35–55 WPM feel)
+_CHAR_DELAY_MIN = 0.045
+_CHAR_DELAY_MAX = 0.14
+_PUNCT_PAUSE_MIN = 0.25
+_PUNCT_PAUSE_MAX = 0.75
+_WORD_PAUSE_CHANCE = 0.12
+_WORD_PAUSE_MIN = 0.08
+_WORD_PAUSE_MAX = 0.35
 
-
-@dataclass(frozen=True)
-class Limits:
-    preset: str
-    label: str
-    min_gap: int
-    max_gap: int
-    hourly: int
-    daily: int
-    weekly: int
-
-
-@dataclass(frozen=True)
-class Decision:
-    action: str
-    seconds: float = 0.0
-    outcome: str = ""
-    log_message: str = ""
-    note: str = ""
-
-
-def normalize(value: object) -> str:
-    key = str(value or "").strip().lower()
-    if key in _PRESETS:
-        return key
-    return "careful"
-
-
-def limits_for(value: object) -> Limits:
-    key = normalize(value)
-    raw = _PRESETS[key]
-    return Limits(
-        preset=key,
-        label=str(raw["label"]),
-        min_gap=int(raw["min_gap"]),
-        max_gap=int(raw["max_gap"]),
-        hourly=int(raw["hourly"]),
-        daily=int(raw["daily"]),
-        weekly=int(raw["weekly"]),
-    )
+# After one send completes, before opening the next new message
+_BETWEEN_PEOPLE_MIN = 16.0
+_BETWEEN_PEOPLE_MAX = 42.0
 
 
 def ledger_path(user_dir: Path) -> Path:
@@ -145,126 +89,25 @@ def recent_send_at(sends: list[dict], name: str, now: float | None = None) -> fl
     return latest
 
 
-def _day_start(now: float) -> float:
-    dt = datetime.fromtimestamp(now)
-    return dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-
-
-def _week_start(now: float) -> float:
-    dt = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0)
-    return (dt - timedelta(days=dt.weekday())).timestamp()
-
-
-def _next_midnight(now: float) -> float:
-    dt = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0)
-    return (dt + timedelta(days=1)).timestamp()
-
-
-def _next_week_start(now: float) -> float:
-    dt = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0)
-    return (dt + timedelta(days=7 - dt.weekday())).timestamp()
-
-
-def counts(sends: list[dict], now: float) -> tuple[int, int, int]:
-    hour_cut = now - 3600
-    day_cut = _day_start(now)
-    week_cut = _week_start(now)
-    hour_n = day_n = week_n = 0
-    for item in sends:
-        at = item["at"]
-        if at >= hour_cut:
-            hour_n += 1
-        if at >= day_cut:
-            day_n += 1
-        if at >= week_cut:
-            week_n += 1
-    return hour_n, day_n, week_n
-
-
-def decide(sends: list[dict], now: float, limits: Limits) -> Decision:
-    hour_n, day_n, week_n = counts(sends, now)
-    if week_n >= limits.weekly:
-        resume = _next_week_start(now)
-        return Decision(
-            action="stop",
-            outcome="weekly",
-            log_message=(
-                f"Weekly pace reached ({week_n}/{limits.weekly} since Monday). "
-                f"Start again after {format_local(resume)}. "
-                "People already messaged are skipped."
-            ),
-            note="Weekly pace reached. Start again next week — already-messaged people are skipped.",
-        )
-    if day_n >= limits.daily:
-        resume = _next_midnight(now)
-        return Decision(
-            action="stop",
-            outcome="daily",
-            log_message=(
-                f"Daily pace reached ({day_n}/{limits.daily} since midnight). "
-                f"Start again after {format_local(resume)}. "
-                "People already messaged are skipped."
-            ),
-            note="Daily pace reached. Start again tomorrow — already-messaged people are skipped.",
-        )
-    if hour_n >= limits.hourly:
-        oldest = min(item["at"] for item in sends if item["at"] >= now - 3600)
-        resume = oldest + 3600 + 1
-        wait = max(0.0, resume - now)
-        if wait > MAX_IN_RUN_WAIT:
-            return Decision(
-                action="stop",
-                outcome="hourly",
-                log_message=(
-                    f"Hourly pace reached ({hour_n}/{limits.hourly} in the last hour). "
-                    f"Next message is allowed after {format_local(resume)}. "
-                    "Chrome will close so the session is not left waiting. "
-                    "People already messaged are skipped."
-                ),
-                note="Hourly pace reached. Start again in a little while — already-messaged people are skipped.",
-            )
-        return Decision(
-            action="wait",
-            seconds=wait,
-            log_message=f"Hourly pace reached ({hour_n}/{limits.hourly}). Waiting {int(wait)}s.",
-        )
-    return Decision(action="send")
-
-
-def wait_after_send(sends: list[dict], now: float, limits: Limits, gap: float | None = None) -> Decision:
-    """Gap before the next person, or a stop if a cap is already full."""
-    decision = decide(sends, now, limits)
-    if decision.action == "stop":
-        return decision
-    if gap is None:
-        gap = random.uniform(limits.min_gap, limits.max_gap)
-    seconds = max(float(gap), decision.seconds)
-    if decision.action == "wait" and decision.log_message:
-        message = f"{decision.log_message.rstrip('.')}. Then continuing."
-        if seconds > decision.seconds:
-            message = f"Waiting {int(seconds)}s before the next message (pace)."
-    else:
-        message = f"Waiting {int(seconds)}s before the next message."
-    return Decision(action="wait", seconds=seconds, log_message=message)
-
-
-def public_usage(user_dir: Path, preset: object, now: float | None = None) -> dict:
-    limits = limits_for(preset)
-    moment = time.time() if now is None else now
+def public_recent(user_dir: Path) -> dict:
+    moment = time.time()
     sends = load_sends(ledger_path(user_dir))
-    hour_n, day_n, week_n = counts(sends, moment)
     cutoff = moment - RETENTION_DAYS * 86400
     recent = [item["name"].strip().casefold() for item in sends if item["at"] >= cutoff and item["name"].strip()]
-    return {
-        "preset": limits.preset,
-        "label": limits.label,
-        "today": day_n,
-        "today_limit": limits.daily,
-        "week": week_n,
-        "week_limit": limits.weekly,
-        "hour": hour_n,
-        "hour_limit": limits.hourly,
-        "min_gap": limits.min_gap,
-        "max_gap": limits.max_gap,
-        "recent_names": recent,
-    }
+    return {"recent_names": recent, "retention_days": RETENTION_DAYS}
+
+
+def char_typing_delay(ch: str) -> float:
+    delay = random.uniform(_CHAR_DELAY_MIN, _CHAR_DELAY_MAX)
+    if ch in ".,!?;:":
+        delay += random.uniform(_PUNCT_PAUSE_MIN, _PUNCT_PAUSE_MAX)
+    elif ch == "\n":
+        delay += random.uniform(_PUNCT_PAUSE_MIN, _PUNCT_PAUSE_MAX * 1.2)
+    elif ch == " " and random.random() < _WORD_PAUSE_CHANCE:
+        delay += random.uniform(_WORD_PAUSE_MIN, _WORD_PAUSE_MAX)
+    return delay
+
+
+def pause_between_people() -> tuple[float, str]:
+    seconds = random.uniform(_BETWEEN_PEOPLE_MIN, _BETWEEN_PEOPLE_MAX)
+    return seconds, f"Pausing {int(seconds)}s before the next person (natural pace)."
