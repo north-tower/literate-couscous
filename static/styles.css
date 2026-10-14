@@ -276,8 +276,9 @@ body.app-shell {
   flex-shrink: 0;
 }
 
-/* Signed in: compact bar — name, nav links, log out (no Sendline lockup) */
-body.user-signed-in .brand-lockup {
+/* Signed in: display name + log out only */
+body.user-signed-in .brand-lockup,
+body.user-signed-in .app-nav {
   display: none;
 }
 
@@ -287,18 +288,13 @@ body.user-signed-in.app-shell .page-intro {
 
 body.user-signed-in .app-header__inner {
   flex-wrap: nowrap;
-  gap: 0.35rem 0.55rem;
-}
-
-body.user-signed-in .app-nav {
-  margin-left: 0;
-  flex: 1 1 auto;
-  min-width: 0;
+  gap: 0.5rem 0.75rem;
 }
 
 body.user-signed-in .user-chip:not([hidden]) {
   flex-shrink: 1;
-  max-width: min(14rem, 34vw);
+  min-width: 0;
+  max-width: min(18rem, 70vw);
 }
 
 .btn--compact {
@@ -1337,12 +1333,6 @@ input:disabled {
     padding-top: 0.15rem;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-  }
-
-  body.user-signed-in .app-nav {
-    order: 0;
-    flex: 1 1 auto;
-    padding-top: 0;
   }
 
   .actions {
