@@ -19,6 +19,8 @@ const attachmentProgress = document.getElementById("attachmentProgress");
 const attachmentProgressFill = document.getElementById("attachmentProgressFill");
 const attachmentProgressLabel = document.getElementById("attachmentProgressLabel");
 const nameCountEl = document.getElementById("nameCount");
+const namesPreviewEl = document.getElementById("namesPreview");
+const namesPreviewBodyEl = document.getElementById("namesPreviewBody");
 const sendHistoryMetaEl = document.getElementById("sendHistoryMeta");
 const sendStyleHintEl = document.getElementById("sendStyleHint");
 const statusEl = document.getElementById("status");
@@ -40,9 +42,10 @@ const linkedinDisplayNameEl = document.getElementById("linkedinDisplayName");
 const linkedinEditBtn = document.getElementById("linkedinEditBtn");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
-const TEMPLATE_NAME_HEADER = "name";
+const TEMPLATE_FIRST_HEADER = "first_name";
+const TEMPLATE_LAST_HEADER = "last_name";
 const TEMPLATE_ERROR =
-  "This file doesn’t match the template. Download the template, keep the name header, and put one full name per row.";
+  "This file doesn’t match the template. Download the template, keep the First name and Last name headers, and add one person per row.";
 
 async function api(url, options = {}) {
   const res = await fetch(url, { credentials: "same-origin", ...options });
@@ -80,7 +83,7 @@ function parseNames(text) {
     .split(/\r?\n/)
     .map((n) => n.trim())
     .filter(Boolean)
-    .filter((n) => !isTemplateNameHeader(n));
+    .filter((n) => !isTemplateHeaderLine(n));
 }
 
 function userDisplayName(email) {
@@ -99,11 +102,45 @@ function syncLinkedInFieldUi(forceForm = false) {
   if (showSummary && linkedinDisplayNameEl) linkedinDisplayNameEl.textContent = username;
 }
 
+function splitFullNameForDisplay(full) {
+  const parts = String(full || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
+function renderNamesPreview() {
+  if (!namesPreviewEl || !namesPreviewBodyEl) return;
+  const names = parseNames(namesEl.value);
+  if (!names.length) {
+    namesPreviewEl.hidden = true;
+    namesPreviewBodyEl.replaceChildren();
+    return;
+  }
+  namesPreviewEl.hidden = false;
+  const frag = document.createDocumentFragment();
+  for (const full of names) {
+    const { first, last } = splitFullNameForDisplay(full);
+    const row = document.createElement("tr");
+    const firstCell = document.createElement("td");
+    firstCell.textContent = first;
+    const lastCell = document.createElement("td");
+    lastCell.textContent = last || "—";
+    row.append(firstCell, lastCell);
+    frag.append(row);
+  }
+  namesPreviewBodyEl.replaceChildren(frag);
+}
+
 function updateCount() {
   const n = parseNames(namesEl.value).length;
   const label = n === 1 ? "1 person" : n + " people";
   nameCountEl.textContent = label;
   nameCountEl.title = n === 1 ? "1 person loaded" : n + " people loaded";
+  renderNamesPreview();
   updateSendHistorySummary();
 }
 
@@ -276,8 +313,18 @@ function looksLikeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
-function isTemplateNameHeader(value) {
-  return headerKey(value) === TEMPLATE_NAME_HEADER;
+function isTemplateHeaderLine(value) {
+  const key = headerKey(value);
+  if (key === "name" || key === TEMPLATE_FIRST_HEADER || key === TEMPLATE_LAST_HEADER) return true;
+  if (key === "first_name_last_name") return true;
+  return false;
+}
+
+function combinePersonName(first, last) {
+  return [first, last]
+    .map((part) => String(part || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 function templateError() {
@@ -331,7 +378,8 @@ async function extractNamesFromText(text, kind, onProgress) {
   const names = [];
   const seen = new Set();
   let delimiter = ",";
-  let nameIndex = 0;
+  let firstIndex = -1;
+  let lastIndex = -1;
   let start = 0;
 
   if (kind === "csv") {
@@ -339,12 +387,13 @@ async function extractNamesFromText(text, kind, onProgress) {
     if (!firstData) throw templateError();
     delimiter = detectDelimiter(firstData);
     const headerCells = parseDelimitedLine(firstData, delimiter);
-    nameIndex = headerCells.findIndex(isTemplateNameHeader);
-    if (nameIndex < 0) throw templateError();
+    firstIndex = headerCells.findIndex((cell) => headerKey(cell) === TEMPLATE_FIRST_HEADER);
+    lastIndex = headerCells.findIndex((cell) => headerKey(cell) === TEMPLATE_LAST_HEADER);
+    if (firstIndex < 0 || lastIndex < 0) throw templateError();
     start = lines.indexOf(firstData) + 1;
   } else if (kind === "txt") {
     const firstData = lines.find((line) => line.trim());
-    if (firstData && isTemplateNameHeader(firstData.trim())) {
+    if (firstData && isTemplateHeaderLine(firstData.trim())) {
       start = lines.indexOf(firstData) + 1;
     }
   }
@@ -358,12 +407,11 @@ async function extractNamesFromText(text, kind, onProgress) {
       let name = "";
       if (kind === "csv") {
         const cells = parseDelimitedLine(raw, delimiter);
-        name = cells[nameIndex] || "";
+        name = combinePersonName(cells[firstIndex], cells[lastIndex]);
       } else {
-        name = raw.trim();
+        name = raw.trim().replace(/\s+/g, " ").trim();
       }
-      name = name.replace(/\s+/g, " ").trim();
-      if (!name || looksLikeEmail(name) || isTemplateNameHeader(name)) continue;
+      if (!name || looksLikeEmail(name) || isTemplateHeaderLine(name)) continue;
       const key = name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -425,7 +473,7 @@ async function importNamesFile(file) {
       hideUploadProgress();
       setStatus(
         kind === "csv"
-          ? "The name column is empty. Add people to the template, then upload."
+          ? "The First name and Last name columns are empty. Add people to the template, then upload."
           : "No names found. Add one full name per line, or use the CSV template.",
         "error"
       );
@@ -437,6 +485,9 @@ async function importNamesFile(file) {
     showUploadProgress(100, "100%");
     await sleep(180);
     hideUploadProgress();
+    if (namesPreviewEl) {
+      namesPreviewEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
     setStatus(`Loaded ${names.length} people from ${file.name}`, "ok");
     saveConfig(true);
   } catch (err) {

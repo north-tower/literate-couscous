@@ -17,7 +17,7 @@ It proves a practical workflow: **queue → personalize → send → observe**. 
 ## How it works
 
 1. Open the Sendline UI in the browser (`http://127.0.0.1:5055`).
-2. Enter **full names** (one per line).
+2. Enter **full names** (one per line), or upload the CSV template with **First name** and **Last name** columns.
 3. Write the message using `{name}` (filled with the person’s first name).
 4. Optionally set an **attachment path** (e.g. a PDF deck).
 5. Click **Launch worker**.

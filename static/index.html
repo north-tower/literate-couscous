@@ -98,7 +98,21 @@
           </div>
           <input type="file" id="namesFile" accept=".txt,.csv,text/plain,text/csv" hidden />
           <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload the template"></textarea>
-          <p class="field-hint">Download the CSV template, replace the example names (one full name per row), then upload.</p>
+          <div class="names-preview" id="namesPreview" hidden>
+            <p class="names-preview-label">People on this list</p>
+            <div class="names-preview-scroll">
+              <table class="names-preview-table">
+                <thead>
+                  <tr>
+                    <th scope="col">First name</th>
+                    <th scope="col">Last name</th>
+                  </tr>
+                </thead>
+                <tbody id="namesPreviewBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <p class="field-hint">Download the CSV template, fill in First name and Last name for each row, then upload. You can also paste one full name per line.</p>
           <div class="upload-progress" id="uploadProgress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="progress-track" aria-hidden="true">
               <div class="progress-fill" id="uploadProgressFill"></div>
