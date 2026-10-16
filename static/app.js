@@ -40,6 +40,8 @@ const linkedinForm = document.getElementById("linkedinForm");
 const linkedinConnectedView = document.getElementById("linkedinConnectedView");
 const linkedinDisplayNameEl = document.getElementById("linkedinDisplayName");
 const linkedinEditBtn = document.getElementById("linkedinEditBtn");
+const linkedinRemoveBtn = document.getElementById("linkedinRemoveBtn");
+const linkedinRemoveBtnForm = document.getElementById("linkedinRemoveBtnForm");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
 const TEMPLATE_FIRST_HEADER = "first_name";
@@ -68,6 +70,7 @@ let attachmentName = null;
 let attachmentUploading = false;
 let stopRequested = false;
 let linkedinConnected = false;
+let linkedinSavedOnServer = false;
 let currentJobId = null;
 let hadActiveJob = false;
 let jobPeopleCount = 0;
@@ -93,6 +96,16 @@ function userDisplayName(email) {
   return local.replace(/[._-]+/g, " ").trim() || value;
 }
 
+function hasLinkedInSaved() {
+  return linkedinSavedOnServer;
+}
+
+function syncLinkedInRemoveUi() {
+  const show = hasLinkedInSaved();
+  if (linkedinRemoveBtn) linkedinRemoveBtn.hidden = !show;
+  if (linkedinRemoveBtnForm) linkedinRemoveBtnForm.hidden = !show;
+}
+
 function syncLinkedInFieldUi(forceForm = false) {
   const username = (linkedinUsernameEl.value || "").trim();
   const showSummary = !forceForm && linkedinConnected && Boolean(username);
@@ -100,6 +113,7 @@ function syncLinkedInFieldUi(forceForm = false) {
   if (linkedinConnectedView) linkedinConnectedView.hidden = !showSummary;
   if (linkedinForm) linkedinForm.hidden = showSummary;
   if (showSummary && linkedinDisplayNameEl) linkedinDisplayNameEl.textContent = username;
+  syncLinkedInRemoveUi();
 }
 
 function splitFullNameForDisplay(full) {
@@ -237,6 +251,7 @@ function applyConfig(cfg) {
   linkedinUsernameEl.value = cfg.linkedin_username || "";
   linkedinPasswordEl.value = "";
   linkedinConnected = Boolean(cfg.linkedin_connected);
+  linkedinSavedOnServer = linkedinConnected || Boolean((cfg.linkedin_username || "").trim());
   linkedinPasswordEl.placeholder = linkedinConnected ? "Leave blank to keep saved password" : "Password";
   if (linkedinStatusEl) {
     linkedinStatusEl.textContent = linkedinConnected ? "saved" : "used to sign in";
@@ -579,6 +594,37 @@ function uploadAttachmentFile(file) {
   xhr.send(body);
 }
 
+async function removeLinkedInFromSendline() {
+  if (
+    !confirm(
+      "Remove saved LinkedIn login and automation browser session from Sendline? You will need to enter credentials again before your next campaign."
+    )
+  ) {
+    return;
+  }
+  try {
+    const res = await api("/api/linkedin", { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) {
+      setStatus(data.error || "Could not remove LinkedIn", "error");
+      return;
+    }
+    if (data.config) applyConfig(data.config);
+    else {
+      linkedinUsernameEl.value = "";
+      linkedinPasswordEl.value = "";
+      linkedinConnected = false;
+      linkedinSavedOnServer = false;
+      syncLinkedInFieldUi(true);
+    }
+    const kind = data.warning ? "stopped" : "ok";
+    setStatus(data.warning || "LinkedIn removed from Sendline", kind);
+  } catch (err) {
+    if (err && err.message === "auth") return;
+    setStatus("Cannot reach Sendline server", "error");
+  }
+}
+
 async function clearAttachment() {
   try {
     const res = await api("/api/attachment", { method: "DELETE" });
@@ -604,6 +650,8 @@ function setRunningUi(active) {
   linkedinUsernameEl.disabled = active;
   linkedinPasswordEl.disabled = active;
   togglePasswordBtn.disabled = active;
+  if (linkedinRemoveBtn) linkedinRemoveBtn.disabled = active;
+  if (linkedinRemoveBtnForm) linkedinRemoveBtnForm.disabled = active;
   if (!active) stopBtn.disabled = false;
   if (active) pulseEl.dataset.state = "running";
 }
@@ -813,6 +861,9 @@ if (linkedinEditBtn) {
     linkedinUsernameEl.focus();
   });
 }
+
+if (linkedinRemoveBtn) linkedinRemoveBtn.addEventListener("click", () => removeLinkedInFromSendline());
+if (linkedinRemoveBtnForm) linkedinRemoveBtnForm.addEventListener("click", () => removeLinkedInFromSendline());
 
 uploadNamesBtn.addEventListener("click", () => namesFileEl.click());
 namesFileEl.addEventListener("change", () => {

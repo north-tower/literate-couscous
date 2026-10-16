@@ -302,6 +302,33 @@ def api_upload_attachment():
     )
 
 
+@app.delete("/api/linkedin")
+@auth.login_required
+def api_clear_linkedin():
+    user = auth.current_user()
+    assert user is not None
+    user_id = int(user["id"])
+    if db.open_job_for_user(user_id):
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "Stop or wait for your campaign to finish before removing LinkedIn.",
+                }
+            ),
+            409,
+        )
+    db.clear_linkedin_secret(user_id)
+    chrome_cleared = db.clear_chrome_profile(user_id)
+    payload: dict = {"ok": True, "config": _public_config(user_id), "chrome_cleared": chrome_cleared}
+    if not chrome_cleared:
+        payload["warning"] = (
+            "Saved login was removed, but the Chrome profile could not be deleted. "
+            "Close automation Chrome and remove again, or delete the folder manually."
+        )
+    return jsonify(payload)
+
+
 @app.delete("/api/attachment")
 @auth.login_required
 def api_clear_attachment():

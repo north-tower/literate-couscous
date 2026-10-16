@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 import threading
 import time
@@ -303,6 +304,24 @@ def upsert_linkedin_secret(
         (user_name, cipher, time.time(), user_id),
     )
     return get_linkedin_secret(user_id)
+
+
+def clear_linkedin_secret(user_id: int) -> None:
+    upsert_linkedin_secret(user_id, username="", password_ciphertext="")
+
+
+def clear_chrome_profile(user_id: int) -> bool:
+    """Delete automation Chrome data for this user. Returns False if the folder could not be removed."""
+    root = chrome_dir(user_id)
+    if not root.exists():
+        ensure_user_dirs(user_id)
+        return True
+    try:
+        shutil.rmtree(root)
+    except OSError:
+        return False
+    ensure_user_dirs(user_id)
+    return True
 
 
 def create_job(user_id: int, people_count: int) -> dict[str, Any]:
