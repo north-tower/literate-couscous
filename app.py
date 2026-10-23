@@ -198,18 +198,6 @@ def admin_page():
     return send_from_directory(STATIC_DIR, "admin.html")
 
 
-@app.get("/api/people-template")
-@auth.login_required
-def api_people_template():
-    return send_from_directory(
-        STATIC_DIR,
-        "people_template.csv",
-        as_attachment=True,
-        download_name="sendline-people-template.csv",
-        mimetype="text/csv; charset=utf-8",
-    )
-
-
 @app.errorhandler(413)
 def api_too_large(_err):
     return jsonify({"ok": False, "error": "That file is too large. Keep attachments under 25 MB."}), 413

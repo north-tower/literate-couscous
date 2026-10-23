@@ -44,10 +44,17 @@ const linkedinRemoveBtn = document.getElementById("linkedinRemoveBtn");
 const linkedinRemoveBtnForm = document.getElementById("linkedinRemoveBtnForm");
 
 const MAX_NAMES_FILE_BYTES = 8 * 1024 * 1024;
-const TEMPLATE_FIRST_HEADER = "first_name";
-const TEMPLATE_LAST_HEADER = "last_name";
-const TEMPLATE_ERROR =
-  "This file doesn’t match the template. Download the template, keep the First name and Last name headers, and add one person per row.";
+const NAME_COLUMN_KEYS = new Set(["name", "full_name", "fullname", "contact", "person", "display_name"]);
+const FIRST_COLUMN_KEYS = new Set(["first_name", "first", "given_name", "givenname", "fname", "forename"]);
+const LAST_COLUMN_KEYS = new Set([
+  "last_name",
+  "last",
+  "surname",
+  "family_name",
+  "familyname",
+  "lname",
+  "second_name",
+]);
 
 async function api(url, options = {}) {
   const res = await fetch(url, { credentials: "same-origin", ...options });
@@ -328,9 +335,13 @@ function looksLikeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function isKnownPeopleHeaderKey(key) {
+  return NAME_COLUMN_KEYS.has(key) || FIRST_COLUMN_KEYS.has(key) || LAST_COLUMN_KEYS.has(key) || key === "email";
+}
+
 function isTemplateHeaderLine(value) {
   const key = headerKey(value);
-  if (key === "name" || key === TEMPLATE_FIRST_HEADER || key === TEMPLATE_LAST_HEADER) return true;
+  if (isKnownPeopleHeaderKey(key)) return true;
   if (key === "first_name_last_name") return true;
   return false;
 }
@@ -340,12 +351,6 @@ function combinePersonName(first, last) {
     .map((part) => String(part || "").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join(" ");
-}
-
-function templateError() {
-  const err = new Error(TEMPLATE_ERROR);
-  err.code = "TEMPLATE";
-  return err;
 }
 
 function detectDelimiter(sample) {
@@ -387,25 +392,63 @@ function parseDelimitedLine(line, delimiter) {
   return out;
 }
 
+function resolveCsvNamePlan(headerCells) {
+  const keys = headerCells.map((cell) => headerKey(cell));
+  const nameIndex = keys.findIndex((key) => NAME_COLUMN_KEYS.has(key));
+  if (nameIndex >= 0) return { mode: "single", nameIndex };
+
+  const firstIndex = keys.findIndex((key) => FIRST_COLUMN_KEYS.has(key));
+  const lastIndex = keys.findIndex((key) => LAST_COLUMN_KEYS.has(key));
+  if (firstIndex >= 0 && lastIndex >= 0) return { mode: "split", firstIndex, lastIndex };
+
+  return null;
+}
+
+function fallbackCsvNamePlan(columnCount) {
+  if (columnCount <= 1) return { mode: "single", nameIndex: 0 };
+  return { mode: "split", firstIndex: 0, lastIndex: 1 };
+}
+
+function rowLooksLikePeopleHeader(cells) {
+  return cells.some((cell) => isKnownPeopleHeaderKey(headerKey(cell)));
+}
+
+function nameFromCsvCells(cells, plan) {
+  if (plan.mode === "single") {
+    return String(cells[plan.nameIndex] || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return combinePersonName(cells[plan.firstIndex], cells[plan.lastIndex]);
+}
+
+function planCsvImport(lines) {
+  const firstData = lines.find((line) => line.trim());
+  if (!firstData) return null;
+  const delimiter = detectDelimiter(firstData);
+  const headerCells = parseDelimitedLine(firstData, delimiter);
+  const explicit = resolveCsvNamePlan(headerCells);
+  const hasHeader = rowLooksLikePeopleHeader(headerCells);
+  const plan = explicit || fallbackCsvNamePlan(headerCells.length);
+  const start = hasHeader || explicit ? lines.indexOf(firstData) + 1 : lines.indexOf(firstData);
+  return { delimiter, plan, start };
+}
+
 async function extractNamesFromText(text, kind, onProgress) {
   const cleaned = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = cleaned.split("\n");
   const names = [];
   const seen = new Set();
   let delimiter = ",";
-  let firstIndex = -1;
-  let lastIndex = -1;
+  let plan = null;
   let start = 0;
 
   if (kind === "csv") {
-    const firstData = lines.find((line) => line.trim());
-    if (!firstData) throw templateError();
-    delimiter = detectDelimiter(firstData);
-    const headerCells = parseDelimitedLine(firstData, delimiter);
-    firstIndex = headerCells.findIndex((cell) => headerKey(cell) === TEMPLATE_FIRST_HEADER);
-    lastIndex = headerCells.findIndex((cell) => headerKey(cell) === TEMPLATE_LAST_HEADER);
-    if (firstIndex < 0 || lastIndex < 0) throw templateError();
-    start = lines.indexOf(firstData) + 1;
+    const csvPlan = planCsvImport(lines);
+    if (!csvPlan) throw new Error("EMPTY");
+    delimiter = csvPlan.delimiter;
+    plan = csvPlan.plan;
+    start = csvPlan.start;
   } else if (kind === "txt") {
     const firstData = lines.find((line) => line.trim());
     if (firstData && isTemplateHeaderLine(firstData.trim())) {
@@ -422,7 +465,7 @@ async function extractNamesFromText(text, kind, onProgress) {
       let name = "";
       if (kind === "csv") {
         const cells = parseDelimitedLine(raw, delimiter);
-        name = combinePersonName(cells[firstIndex], cells[lastIndex]);
+        name = nameFromCsvCells(cells, plan);
       } else {
         name = raw.trim().replace(/\s+/g, " ").trim();
       }
@@ -440,7 +483,7 @@ async function extractNamesFromText(text, kind, onProgress) {
 
 function fileKind(file) {
   const name = (file.name || "").toLowerCase();
-  if (name.endsWith(".csv")) return "csv";
+  if (name.endsWith(".csv") || name.endsWith(".tsv")) return "csv";
   if (name.endsWith(".txt")) return "txt";
   const type = (file.type || "").toLowerCase();
   if (type.includes("csv")) return "csv";
@@ -488,8 +531,8 @@ async function importNamesFile(file) {
       hideUploadProgress();
       setStatus(
         kind === "csv"
-          ? "The First name and Last name columns are empty. Add people to the template, then upload."
-          : "No names found. Add one full name per line, or use the CSV template.",
+          ? "No names found in that spreadsheet. Use a name column, or first and last name columns, then upload again."
+          : "No names found. Add one full name per line, then upload or paste into the box below.",
         "error"
       );
       return;
@@ -507,7 +550,12 @@ async function importNamesFile(file) {
     saveConfig(true);
   } catch (err) {
     hideUploadProgress();
-    setStatus(err && err.code === "TEMPLATE" ? TEMPLATE_ERROR : "Could not read that file. Download the template and upload the filled CSV.", "error");
+    setStatus(
+      err && err.message === "EMPTY"
+        ? "That file is empty."
+        : "Could not read that file. Try a .txt list (one name per line) or a .csv with names.",
+      "error"
+    );
   } finally {
     namesImporting = false;
     uploadNamesBtn.disabled = false;
@@ -889,7 +937,7 @@ namesField.addEventListener("drop", (event) => {
   const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
   if (!file) return;
   if (!isNamesFile(file)) {
-    setStatus("Please drop the filled template (.csv) or a .txt list.", "error");
+    setStatus("Please drop a .csv or .txt file with people names.", "error");
     return;
   }
   importNamesFile(file);

@@ -93,13 +93,12 @@
           <div class="field-head">
             <label for="names">People</label>
             <div class="field-tools">
-              <a class="text-btn" href="/api/people-template" download="sendline-people-template.csv">Download template</a>
               <button type="button" class="text-btn" id="uploadNamesBtn">Upload file</button>
               <span class="meta count-pill" id="nameCount" title="0 people loaded">0 people</span>
             </div>
           </div>
-          <input type="file" id="namesFile" accept=".txt,.csv,text/plain,text/csv" hidden />
-          <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload the template"></textarea>
+          <input type="file" id="namesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" hidden />
+          <textarea id="names" spellcheck="false" placeholder="One full name per line, or upload a .csv / .txt file"></textarea>
           <div class="names-preview" id="namesPreview" hidden>
             <p class="names-preview-label">People on this list</p>
             <div class="names-preview-scroll">
@@ -114,7 +113,7 @@
               </table>
             </div>
           </div>
-          <p class="field-hint">Download the CSV template, fill in First name and Last name for each row, then upload. You can also paste one full name per line.</p>
+          <p class="field-hint">Upload a .csv or .txt from Mac or Windows (comma, semicolon, or tab separated). We load names here so you can review and edit before you run. Or paste one full name per line.</p>
           <div class="upload-progress" id="uploadProgress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="progress-track" aria-hidden="true">
               <div class="progress-fill" id="uploadProgressFill"></div>
