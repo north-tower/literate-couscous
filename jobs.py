@@ -641,6 +641,8 @@ def request_stop(user_id: int) -> dict:
             else "[sendline] removed from the Chrome queue",
         )
         return db.get_job(job_id) or job
+    if job["status"] == "stopping":
+        return db.get_job(job_id) or job
     if not local:
         write_stop_flag(int(job["user_id"]), job_id)
     db.update_job(job_id, status="stopping")
@@ -659,13 +661,48 @@ def request_stop(user_id: int) -> dict:
             args=(proc, job_id, int(job["user_id"])),
             daemon=True,
         ).start()
+    elif local and not already:
+        with _lock:
+            _force_stop_started.add(job_id)
+        threading.Thread(
+            target=_force_stop_local_if_needed,
+            args=(job_id,),
+            daemon=True,
+        ).start()
     return db.get_job(job_id) or job
+
+
+def _force_stop_local_if_needed(job_id: int) -> None:
+    """If a desktop job stays ``stopping`` too long, finalize so the UI can recover."""
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        job = db.get_job(job_id)
+        if not job or job["status"] != "stopping":
+            with _lock:
+                _force_stop_started.discard(job_id)
+            return
+        time.sleep(0.5)
+    job = db.get_job(job_id)
+    if not job or job["status"] != "stopping":
+        with _lock:
+            _force_stop_started.discard(job_id)
+        return
+    append_log(
+        job_id,
+        "[sendline] desktop agent did not confirm stop in time — marking campaign cancelled",
+    )
+    finalize_job_from_exit_code(job_id, 130)
+    start_next()
+    with _lock:
+        _force_stop_started.discard(job_id)
 
 
 def _force_stop_if_needed(proc: subprocess.Popen, job_id: int, user_id: int) -> None:
     deadline = time.time() + 15
     while time.time() < deadline:
         if proc.poll() is not None:
+            with _lock:
+                _force_stop_started.discard(job_id)
             return
         time.sleep(0.3)
     append_log(job_id, "[sendline] worker did not stop in time — forcing exit and closing Chrome")
@@ -681,6 +718,8 @@ def _force_stop_if_needed(proc: subprocess.Popen, job_id: int, user_id: int) -> 
             pass
     kill_pid_tree(read_chrome_pid(user_id, job_id))
     kill_debug_port_listeners()
+    with _lock:
+        _force_stop_started.discard(job_id)
 
 
 def current_proc_job_id() -> int | None:

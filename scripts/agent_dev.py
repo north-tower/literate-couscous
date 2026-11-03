@@ -377,6 +377,18 @@ def agent_run_loop(api: ApiClient) -> None:
             continue
 
         if active_job is None and work.get("status") in ("running", "stopping"):
+            if poll.get("stop_requested"):
+                flag = job_folder(job_id) / "stop"
+                flag.parent.mkdir(parents=True, exist_ok=True)
+                flag.write_text("stop\n", encoding="utf-8")
+                print(f"[agent_dev] orphan stop → {flag}", flush=True)
+                try:
+                    api.post_complete(job_id, 130)
+                    print(f"[agent_dev] orphan job {job_id} cancelled on server", flush=True)
+                except Exception as exc:
+                    print(f"[agent_dev] orphan complete failed: {exc}", flush=True)
+                time.sleep(POLL_IDLE_SEC)
+                continue
             print(
                 f"[agent_dev] job {job_id} in progress on server but this agent did not start it "
                 f"(status={work.get('status')}). Waiting…",

@@ -528,6 +528,8 @@ def start_or_attach_chrome() -> webdriver.Chrome:
 
     try:
         _wait_for_port(DEBUG_HOST, DEBUG_PORT)
+        if should_stop():
+            raise StopRequested()
         options = Options()
         options.add_experimental_option("debuggerAddress", f"{DEBUG_HOST}:{DEBUG_PORT}")
         driver_local = webdriver.Chrome(options=options)
@@ -539,6 +541,8 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         print(f"Debug-port attach failed ({exc}). Falling back to Selenium launch…")
         _kill_job_chrome()
         _ensure_automation_profile_dir()
+        if should_stop():
+            raise StopRequested()
         options = Options()
         options.binary_location = str(chrome_exe)
         options.add_argument(f"--user-data-dir={profile}")
@@ -551,6 +555,8 @@ def start_or_attach_chrome() -> webdriver.Chrome:
             options.add_argument(arg)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
+        if should_stop():
+            raise StopRequested()
         driver_local = webdriver.Chrome(options=options)
         service = getattr(driver_local, "service", None)
         proc = getattr(service, "process", None)
@@ -984,6 +990,8 @@ if __name__ == "__main__":
             print(f"{len(pending)} people left after skipping recent messages.")
             if run_proxy:
                 start_residential_proxy(run_proxy)
+            if should_stop():
+                raise StopRequested()
             browser_started = True
             driver = start_or_attach_chrome()
             login_to_linkedin(run_email, run_password)
