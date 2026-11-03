@@ -265,6 +265,8 @@ function resetDesktopOnboardingUi() {
   }
   if (desktopOnboardingLinkBtn) desktopOnboardingLinkBtn.disabled = false;
   if (desktopOnboardingLabelEl) desktopOnboardingLabelEl.value = defaultDesktopAgentLabel();
+  const titleEl = document.getElementById("desktopOnboardingTitle");
+  if (titleEl) titleEl.textContent = "Link this PC";
 }
 
 function openDesktopOnboarding() {
@@ -319,7 +321,11 @@ async function pollDesktopOnboardingConnection() {
         ready = ready && agentOnline;
       } else if (window.sendlineDesktop?.getAgentStatus) {
         const status = await window.sendlineDesktop.getAgentStatus();
-        ready = ready && Boolean(status?.connected);
+        ready =
+          ready &&
+          !status?.token_invalid &&
+          status?.phase !== "error" &&
+          Boolean(status?.connected);
       }
     } catch (err) {
       if (err && err.message === "auth") return;
@@ -397,11 +403,17 @@ function setDesktopDialogLayout(mode) {
 
 function openDesktopDialog() {
   if (!desktopDialogEl || typeof desktopDialogEl.showModal !== "function") return;
-  const linkedOnDesktop = isSendlineDesktop && desktopHasToken;
-  setDesktopDialogLayout(linkedOnDesktop ? "linked" : isSendlineDesktop ? "link" : "manage");
+  const tokenRejected = desktopTokenRejected();
+  const linkedOnDesktop = desktopLinkHealthy();
+  setDesktopDialogLayout(
+    linkedOnDesktop ? "linked" : isSendlineDesktop ? "link" : "manage",
+  );
   desktopTokenRevealEl.hidden = true;
   if (desktopNewTokenEl) desktopNewTokenEl.value = "";
-  setDesktopDialogStatus("", "");
+  setDesktopDialogStatus(
+    tokenRejected ? "Your saved agent token was rejected. Link this PC again to replace it." : "",
+    tokenRejected ? "warn" : "",
+  );
   if (desktopRegisterLabelEl) desktopRegisterLabelEl.value = defaultDesktopAgentLabel();
   desktopDialogEl.showModal();
   if (linkedOnDesktop) return;
@@ -572,7 +584,36 @@ let desktopHasToken = false;
 let desktopOnboardingActive = false;
 let desktopOnboardingPollTimer = null;
 let desktopStatusTimer = null;
+let desktopRelinkPromptShown = false;
 let csrfToken = null;
+
+function desktopTokenRejected() {
+  return Boolean(
+    isSendlineDesktop && desktopHasToken && lastDesktopAgentStatus?.token_invalid,
+  );
+}
+
+function desktopLinkHealthy() {
+  return Boolean(isSendlineDesktop && desktopHasToken && !desktopTokenRejected());
+}
+
+function maybePromptDesktopRelink() {
+  if (!isSendlineDesktop || !desktopTokenRejected()) {
+    desktopRelinkPromptShown = false;
+    return;
+  }
+  if (desktopRelinkPromptShown) return;
+  if (desktopOnboardingActive || desktopDialogEl?.open) return;
+  if (!document.body.classList.contains("user-signed-in")) return;
+  desktopRelinkPromptShown = true;
+  openDesktopOnboardingForRelink();
+}
+
+function openDesktopOnboardingForRelink() {
+  const titleEl = document.getElementById("desktopOnboardingTitle");
+  if (titleEl) titleEl.textContent = "Link this PC again";
+  openDesktopOnboarding();
+}
 
 const STATUS_ICONS = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>',
@@ -1201,7 +1242,7 @@ function setRunningUi(active) {
 function syncDesktopLiveLogPulse() {
   if (!isSendlineDesktop || !pulseEl) return;
   const jobState = pulseEl.dataset.state;
-  if (lastDesktopAgentStatus?.phase === "error") {
+  if (lastDesktopAgentStatus?.token_invalid || lastDesktopAgentStatus?.phase === "error") {
     pulseEl.dataset.state = "error";
     return;
   }
@@ -1229,29 +1270,38 @@ function applyDesktopFeedback(data) {
 
 function updateDesktopBanner() {
   if (!desktopBannerEl) return;
+  const rejected = desktopTokenRejected();
   const needsDesktop = executionMode === "local" && !agentOnline;
-  desktopBannerEl.hidden = !needsDesktop;
+  const showBanner = needsDesktop || rejected;
+  desktopBannerEl.hidden = !showBanner;
   if (desktopBannerTextEl && isSendlineDesktop) {
-    desktopBannerTextEl.textContent =
-      "Link this PC to run campaigns locally, or paste an agent token in tray → Settings.";
+    desktopBannerTextEl.textContent = rejected
+      ? "This PC’s agent token was rejected. Link this PC again to run campaigns locally."
+      : "Link this PC to run campaigns locally, or paste an agent token in tray → Settings.";
   }
   if (desktopBannerLinkBtn && isSendlineDesktop) {
-    desktopBannerLinkBtn.textContent = "Link this PC";
+    desktopBannerLinkBtn.textContent = rejected ? "Link again" : "Link this PC";
   }
-  if (desktopOnboardingActive && needsDesktop) {
+  if (desktopOnboardingActive && needsDesktop && !rejected) {
     desktopBannerEl.hidden = true;
   }
 }
 
 function updateDesktopNavLabel() {
   if (!desktopNavBtn) return;
-  const linked = isSendlineDesktop && desktopHasToken;
-  desktopNavBtn.textContent = linked ? "Linked" : "Desktop";
+  const rejected = desktopTokenRejected();
+  const linked = desktopLinkHealthy();
+  desktopNavBtn.textContent = rejected ? "Re-link PC" : linked ? "Linked" : "Desktop";
   desktopNavBtn.setAttribute(
     "aria-label",
-    linked ? "This PC is linked" : "Link or manage Sendline Desktop"
+    rejected
+      ? "Agent token rejected — link this PC again"
+      : linked
+        ? "This PC is linked"
+        : "Link or manage Sendline Desktop",
   );
   desktopNavBtn.classList.toggle("app-nav__link--linked", linked);
+  desktopNavBtn.classList.toggle("app-nav__link--warn", rejected);
 }
 
 function syncDesktopNav() {
@@ -1265,18 +1315,32 @@ function syncDesktopNav() {
 function refreshDesktopLinkStatus() {
   if (!isSendlineDesktop) return;
   const signedIn = document.body.classList.contains("user-signed-in");
-  const linked = Boolean(desktopHasToken);
+  const rejected = desktopTokenRejected();
+  const linked = desktopLinkHealthy();
   if (desktopLinkedChipEl) {
-    desktopLinkedChipEl.hidden = !signedIn || !linked;
+    desktopLinkedChipEl.hidden = !signedIn || (!linked && !rejected);
+    desktopLinkedChipEl.textContent = rejected ? "Re-link" : "Linked";
+    desktopLinkedChipEl.classList.toggle("desktop-linked-chip--warn", rejected);
     desktopLinkedChipEl.setAttribute(
       "aria-label",
-      linked ? "This computer is linked to Sendline" : "This computer is not linked"
+      rejected
+        ? "Agent token rejected — link this PC again"
+        : linked
+          ? "This computer is linked to Sendline"
+          : "This computer is not linked",
     );
   }
   renderDesktopBottomStatusBar(lastDesktopAgentStatus);
+  updateDesktopBanner();
 }
 
 function formatDesktopAgentStatus(status) {
+  if (status?.token_invalid) {
+    return {
+      text: "Agent token rejected — use Link this PC (or Link again in the banner) to connect",
+      tone: "error",
+    };
+  }
   const linked = Boolean(desktopHasToken || status?.connected);
   if (!linked) {
     return { text: "Not linked — Link this PC or tray → Settings", tone: "warn" };
@@ -1323,6 +1387,9 @@ function initDesktopBottomStatusBar() {
   window.sendlineDesktop.onAgentStatus((status) => {
     lastDesktopAgentStatus = status;
     renderDesktopBottomStatusBar(status);
+    updateDesktopNavLabel();
+    refreshDesktopLinkStatus();
+    maybePromptDesktopRelink();
   });
 }
 

@@ -277,6 +277,15 @@ body.app-shell {
   opacity: 0.88;
 }
 
+.app-nav__link--warn {
+  color: var(--warn, #b45309);
+}
+
+.app-nav__link--warn:hover {
+  color: var(--warn, #b45309);
+  opacity: 0.88;
+}
+
 .app-header__end {
   display: flex;
   align-items: center;
@@ -424,6 +433,10 @@ body.user-signed-in .user-chip:not([hidden]) {
 
 .desktop-dialog__status[data-tone="error"] {
   color: var(--danger, #b42318);
+}
+
+.desktop-dialog__status[data-tone="warn"] {
+  color: var(--warn, #b45309);
 }
 
 .desktop-dialog__actions {
@@ -2654,6 +2667,12 @@ body.is-sendline-desktop .desktop-linked-chip {
 
 body.is-sendline-desktop .desktop-linked-chip[hidden] {
   display: none !important;
+}
+
+body.is-sendline-desktop .desktop-linked-chip--warn {
+  background: rgba(180, 83, 9, 0.12);
+  border-color: rgba(180, 83, 9, 0.28);
+  color: var(--warn, #b45309);
 }
 
 body.is-sendline-desktop #logoutBtn {
