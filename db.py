@@ -2,7 +2,9 @@
 """SQLite tenancy for Sendline users, campaigns, secrets, and jobs."""
 from __future__ import annotations
 
+import hashlib
 import json
+import secrets
 import shutil
 import sqlite3
 import threading
@@ -17,6 +19,11 @@ DB_PATH = DATA_DIR / "sendline.db"
 
 JOB_OPEN = ("queued", "running", "stopping")
 JOB_QUEUED_OR_RUNNING = ("queued", "running")
+
+EXECUTION_MODE_SERVER = "server"
+EXECUTION_MODE_LOCAL = "local"
+EXECUTION_MODES = (EXECUTION_MODE_SERVER, EXECUTION_MODE_LOCAL)
+AGENT_ONLINE_WINDOW_SEC = 60
 
 _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
@@ -121,6 +128,27 @@ def init_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN proxy_label TEXT NOT NULL DEFAULT ''")
         if "proxy_mode" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN proxy_mode TEXT NOT NULL DEFAULT ''")
+        if "execution_mode" not in user_columns:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'server'"
+            )
+
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS agent_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                label TEXT NOT NULL DEFAULT '',
+                token_hash TEXT NOT NULL UNIQUE,
+                created_at REAL NOT NULL,
+                last_seen_at REAL,
+                revoked_at REAL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_agent_tokens_user_id ON agent_tokens(user_id);
+            CREATE INDEX IF NOT EXISTS idx_agent_tokens_token_hash ON agent_tokens(token_hash);
+            """
+        )
 
 
 def execute(sql: str, params: Iterable[Any] = ()) -> sqlite3.Cursor:
@@ -186,9 +214,26 @@ def create_user(email: str, password_hash: str, role: str = "operator") -> dict[
 
 def list_users() -> list[dict[str, Any]]:
     return fetchall(
-        """SELECT id, email, role, is_active, created_at, proxy_label, proxy_mode
+        """SELECT id, email, role, is_active, created_at, proxy_label, proxy_mode, execution_mode
            FROM users ORDER BY created_at ASC, id ASC"""
     )
+
+
+def get_execution_mode(user_id: int) -> str:
+    row = fetchone("SELECT execution_mode FROM users WHERE id = ?", (user_id,))
+    if not row:
+        return EXECUTION_MODE_SERVER
+    mode = str(row.get("execution_mode") or EXECUTION_MODE_SERVER).strip().lower()
+    if mode not in EXECUTION_MODES:
+        return EXECUTION_MODE_SERVER
+    return mode
+
+
+def set_user_execution_mode(user_id: int, mode: str) -> dict[str, Any] | None:
+    if mode not in EXECUTION_MODES:
+        raise ValueError("execution_mode must be server or local")
+    execute("UPDATE users SET execution_mode = ? WHERE id = ?", (mode, user_id))
+    return get_user_by_id(user_id)
 
 
 def get_user_proxy(user_id: int) -> dict[str, Any] | None:
@@ -373,8 +418,32 @@ def running_job() -> dict[str, Any] | None:
     )
 
 
+def running_server_job() -> dict[str, Any] | None:
+    """VPS Chrome slot: running/stopping job for a ``execution_mode=server`` user."""
+    return fetchone(
+        """SELECT jobs.* FROM jobs
+           JOIN users ON users.id = jobs.user_id
+           WHERE jobs.status IN ('running', 'stopping')
+             AND users.execution_mode = ?
+           ORDER BY jobs.id ASC LIMIT 1""",
+        (EXECUTION_MODE_SERVER,),
+    )
+
+
 def next_queued_job() -> dict[str, Any] | None:
     return fetchone("SELECT * FROM jobs WHERE status = 'queued' ORDER BY id ASC LIMIT 1")
+
+
+def next_queued_server_job() -> dict[str, Any] | None:
+    """Next FIFO job for the VPS worker (skips ``local`` users)."""
+    return fetchone(
+        """SELECT jobs.* FROM jobs
+           JOIN users ON users.id = jobs.user_id
+           WHERE jobs.status = 'queued'
+             AND users.execution_mode = ?
+           ORDER BY jobs.id ASC LIMIT 1""",
+        (EXECUTION_MODE_SERVER,),
+    )
 
 
 def stale_running_jobs() -> list[dict[str, Any]]:
@@ -397,12 +466,20 @@ def latest_job_for_user(user_id: int) -> dict[str, Any] | None:
 
 
 def queue_snapshot() -> dict[str, Any]:
-    current = running_job()
+    current = running_server_job()
     queued = fetchall(
         """SELECT jobs.id, jobs.user_id, jobs.status, jobs.created_at, jobs.people_count, users.email
            FROM jobs JOIN users ON users.id = jobs.user_id
-           WHERE jobs.status = 'queued'
-           ORDER BY jobs.id ASC"""
+           WHERE jobs.status = 'queued' AND users.execution_mode = ?
+           ORDER BY jobs.id ASC""",
+        (EXECUTION_MODE_SERVER,),
+    )
+    local_running = fetchall(
+        """SELECT jobs.id, jobs.user_id, jobs.status, jobs.started_at, jobs.people_count, users.email
+           FROM jobs JOIN users ON users.id = jobs.user_id
+           WHERE jobs.status IN ('running', 'stopping') AND users.execution_mode = ?
+           ORDER BY jobs.id ASC""",
+        (EXECUTION_MODE_LOCAL,),
     )
     running = None
     if current:
@@ -415,4 +492,94 @@ def queue_snapshot() -> dict[str, Any]:
             "people_count": current["people_count"],
             "started_at": current["started_at"],
         }
-    return {"running": running, "queued": queued, "queue_length": len(queued)}
+    return {
+        "running": running,
+        "queued": queued,
+        "queue_length": len(queued),
+        "local_running": local_running,
+    }
+
+
+def hash_agent_token(plaintext: str) -> str:
+    return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
+
+
+def create_agent_token(user_id: int, label: str) -> tuple[str, dict[str, Any]]:
+    """Insert agent_tokens row; return (plaintext token, row dict)."""
+    plaintext = secrets.token_urlsafe(32)
+    token_hash = hash_agent_token(plaintext)
+    now = time.time()
+    label = (label or "").strip()[:120] or "Desktop"
+    with _lock:
+        cur = execute(
+            """INSERT INTO agent_tokens (user_id, label, token_hash, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (user_id, label, token_hash, now),
+        )
+        token_id = int(cur.lastrowid)
+    row = get_agent_token(token_id)
+    assert row is not None
+    return plaintext, row
+
+
+def get_agent_token(token_id: int) -> dict[str, Any] | None:
+    return fetchone("SELECT * FROM agent_tokens WHERE id = ?", (token_id,))
+
+
+def get_agent_token_by_hash(token_hash: str) -> dict[str, Any] | None:
+    return fetchone(
+        """SELECT * FROM agent_tokens
+           WHERE token_hash = ? AND revoked_at IS NULL""",
+        (token_hash,),
+    )
+
+
+def list_agent_tokens(user_id: int) -> list[dict[str, Any]]:
+    return fetchall(
+        """SELECT id, user_id, label, created_at, last_seen_at, revoked_at
+           FROM agent_tokens
+           WHERE user_id = ?
+           ORDER BY created_at DESC, id DESC""",
+        (user_id,),
+    )
+
+
+def revoke_agent_token(user_id: int, token_id: int) -> dict[str, Any] | None:
+    row = fetchone(
+        "SELECT * FROM agent_tokens WHERE id = ? AND user_id = ?",
+        (token_id, user_id),
+    )
+    if not row or row.get("revoked_at") is not None:
+        return None
+    now = time.time()
+    execute("UPDATE agent_tokens SET revoked_at = ? WHERE id = ?", (now, token_id))
+    return get_agent_token(token_id)
+
+
+def touch_agent_token_last_seen(token_id: int, when: float | None = None) -> None:
+    execute(
+        "UPDATE agent_tokens SET last_seen_at = ? WHERE id = ? AND revoked_at IS NULL",
+        (when if when is not None else time.time(), token_id),
+    )
+
+
+def user_agent_online(user_id: int, within_sec: float | None = None) -> bool:
+    """True if the user has a non-revoked agent token with recent heartbeat/work poll."""
+    window = AGENT_ONLINE_WINDOW_SEC if within_sec is None else within_sec
+    cutoff = time.time() - window
+    row = fetchone(
+        """SELECT 1 FROM agent_tokens
+           WHERE user_id = ? AND revoked_at IS NULL
+             AND last_seen_at IS NOT NULL AND last_seen_at >= ?
+           LIMIT 1""",
+        (user_id, cutoff),
+    )
+    return row is not None
+
+
+def get_desktop_feedback(user_id: int) -> dict[str, Any]:
+    mode = get_execution_mode(user_id)
+    return {
+        "execution_mode": mode,
+        "agent_online": user_agent_online(user_id) if mode == EXECUTION_MODE_LOCAL else False,
+    }

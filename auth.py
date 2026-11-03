@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHash, VerifyMismatchError
-from flask import jsonify, redirect, request, session
+from flask import g, jsonify, redirect, request, session
 
 import db
 
@@ -156,6 +156,65 @@ def login_allowed(ip: str) -> bool:
 
 def record_login_attempt(ip: str) -> None:
     _login_attempts[ip].append(time.time())
+
+
+def csrf_token() -> str | None:
+    value = session.get("csrf")
+    return str(value) if value else None
+
+
+def csrf_valid() -> bool:
+    expected = session.get("csrf")
+    if not expected:
+        return False
+    provided = request.headers.get("X-CSRF-Token") or ""
+    return secrets.compare_digest(str(expected), str(provided))
+
+
+def csrf_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not csrf_valid():
+            return jsonify({"ok": False, "error": "Invalid CSRF token."}), 403
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def _parse_bearer_token() -> str | None:
+    header = request.headers.get("Authorization") or ""
+    if not header.startswith("Bearer "):
+        return None
+    token = header[7:].strip()
+    return token or None
+
+
+def resolve_agent_user() -> dict | None:
+    """Validate Bearer agent token; return user dict or None."""
+    plaintext = _parse_bearer_token()
+    if not plaintext:
+        return None
+    token_hash = db.hash_agent_token(plaintext)
+    row = db.get_agent_token_by_hash(token_hash)
+    if not row:
+        return None
+    user = db.get_user_by_id(int(row["user_id"]))
+    if not user or not user.get("is_active"):
+        return None
+    g.agent_token = row
+    return user
+
+
+def agent_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = resolve_agent_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "Invalid or revoked agent token."}), 401
+        g.agent_user = user
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 def origin_allowed() -> bool:

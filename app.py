@@ -9,7 +9,7 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, g, jsonify, redirect, request, send_file, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 ROOT = Path(__file__).resolve().parent
@@ -233,13 +233,15 @@ def api_session():
     user = auth.current_user()
     if user is None:
         return jsonify({"ok": True, "authenticated": False})
-    return jsonify(
-        {
-            "ok": True,
-            "authenticated": True,
-            "user": auth.public_user(user),
-        }
-    )
+    payload: dict = {
+        "ok": True,
+        "authenticated": True,
+        "user": auth.public_user(user),
+    }
+    csrf = auth.csrf_token()
+    if csrf:
+        payload["csrf"] = csrf
+    return jsonify(payload)
 
 
 @app.get("/api/me")
@@ -247,7 +249,177 @@ def api_session():
 def api_me():
     user = auth.current_user()
     assert user is not None
-    return jsonify({"ok": True, "user": auth.public_user(user)})
+    user_id = int(user["id"])
+    payload: dict = {"ok": True, "user": auth.public_user(user)}
+    payload.update(db.get_desktop_feedback(user_id))
+    csrf = auth.csrf_token()
+    if csrf:
+        payload["csrf"] = csrf
+    return jsonify(payload)
+
+
+def _public_agent_token(row: dict) -> dict:
+    revoked_at = row.get("revoked_at")
+    return {
+        "id": int(row["id"]),
+        "label": row.get("label") or "",
+        "created_at": row.get("created_at"),
+        "last_seen_at": row.get("last_seen_at"),
+        "revoked_at": revoked_at,
+        "active": revoked_at is None,
+        "token_hint": "••••••••",
+    }
+
+
+@app.post("/api/agent/register")
+@auth.login_required
+@auth.csrf_required
+def api_agent_register():
+    ip = auth.client_ip()
+    if not auth.login_allowed(ip):
+        return jsonify(
+            {"ok": False, "error": "Too many attempts. Try again in a few minutes."}
+        ), 429
+    auth.record_login_attempt(ip)
+    user = auth.current_user()
+    assert user is not None
+    body = request.get_json(force=True, silent=True) or {}
+    label = str(body.get("label") or "").strip()
+    plaintext, row = db.create_agent_token(int(user["id"]), label)
+    return jsonify(
+        {
+            "ok": True,
+            "token": plaintext,
+            "agent_token": _public_agent_token(row),
+        }
+    ), 201
+
+
+@app.post("/api/agent/revoke")
+@auth.login_required
+@auth.csrf_required
+def api_agent_revoke():
+    user = auth.current_user()
+    assert user is not None
+    body = request.get_json(force=True, silent=True) or {}
+    token_id = body.get("id")
+    try:
+        token_id_int = int(token_id)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Token id is required."}), 400
+    row = db.revoke_agent_token(int(user["id"]), token_id_int)
+    if not row:
+        return jsonify({"ok": False, "error": "Token not found or already revoked."}), 404
+    return jsonify({"ok": True, "agent_token": _public_agent_token(row)})
+
+
+@app.get("/api/agent/tokens")
+@auth.login_required
+def api_agent_tokens():
+    user = auth.current_user()
+    assert user is not None
+    tokens = [_public_agent_token(row) for row in db.list_agent_tokens(int(user["id"]))]
+    return jsonify({"ok": True, "tokens": tokens})
+
+
+def _request_base_url() -> str:
+    return (request.url_root or "").rstrip("/")
+
+
+@app.get("/api/agent/work")
+@auth.agent_required
+def api_agent_work():
+    user = g.agent_user  # type: ignore[attr-defined]
+    token = g.agent_token  # type: ignore[attr-defined]
+    db.touch_agent_token_last_seen(int(token["id"]))
+    payload = jobs.agent_poll_work(int(user["id"]), request_base_url=_request_base_url())
+    return jsonify(payload)
+
+
+@app.post("/api/agent/logs")
+@auth.agent_required
+def api_agent_logs():
+    user = g.agent_user  # type: ignore[attr-defined]
+    body = request.get_json(force=True, silent=True) or {}
+    job_id = body.get("job_id")
+    lines = body.get("lines")
+    if lines is None or not isinstance(lines, list):
+        return jsonify({"ok": False, "error": "lines must be an array."}), 400
+    try:
+        job_id_int = int(job_id)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "job_id is required."}), 400
+    try:
+        jobs.agent_append_logs(int(user["id"]), job_id_int, lines)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
+@app.post("/api/agent/heartbeat")
+@auth.agent_required
+def api_agent_heartbeat():
+    token = g.agent_token  # type: ignore[attr-defined]
+    db.touch_agent_token_last_seen(int(token["id"]))
+    body = request.get_json(force=True, silent=True) or {}
+    # worker_version / agent_version reserved for future telemetry
+    _ = body.get("worker_version"), body.get("agent_version")
+    return jsonify({"ok": True})
+
+
+@app.post("/api/agent/complete")
+@auth.agent_required
+def api_agent_complete():
+    user = g.agent_user  # type: ignore[attr-defined]
+    body = request.get_json(force=True, silent=True) or {}
+    job_id = body.get("job_id")
+    exit_code = body.get("exit_code")
+    try:
+        job_id_int = int(job_id)
+        exit_code_int = int(exit_code)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "job_id and exit_code are required."}), 400
+    try:
+        job = jobs.agent_complete_job(int(user["id"]), job_id_int, exit_code_int)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "job": {"id": job["id"], "status": job["status"], "exit_code": job.get("exit_code")}})
+
+
+def _resolve_agent_attachment_access(job_id: int) -> tuple[int, dict] | tuple[None, None]:
+    """Bearer agent auth or signed query ?expires=&sig= for the same job."""
+    user = auth.resolve_agent_user()
+    if user is not None:
+        return int(user["id"]), user
+    expires_raw = request.args.get("expires", "")
+    sig = (request.args.get("sig") or "").strip()
+    try:
+        expires_at = int(expires_raw)
+    except (TypeError, ValueError):
+        return None, None
+    job = db.get_job(job_id)
+    if not job:
+        return None, None
+    user_id = int(job["user_id"])
+    if not jobs.verify_attachment_download(job_id, user_id, expires_at, sig):
+        return None, None
+    owner = db.get_user_by_id(user_id)
+    if not owner or not owner.get("is_active"):
+        return None, None
+    return user_id, owner
+
+
+@app.get("/api/agent/jobs/<int:job_id>/attachment")
+def api_agent_job_attachment(job_id: int):
+    user_id, _user = _resolve_agent_attachment_access(job_id)
+    if user_id is None:
+        return jsonify({"ok": False, "error": "Unauthorized."}), 401
+    path = jobs.resolve_job_attachment_path(user_id, job_id)
+    if path is None:
+        return jsonify({"ok": False, "error": "Attachment not found."}), 404
+    campaign = db.get_campaign(user_id)
+    download_name = campaign.get("attachment_name") or path.name
+    return send_file(path, as_attachment=True, download_name=download_name)
 
 
 @app.post("/api/attachment")
@@ -402,6 +574,8 @@ def api_run():
 
     try:
         job = jobs.enqueue(user_id, len(saved["people_names"]))
+    except jobs.AgentOfflineError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 409
 

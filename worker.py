@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import random
+import re
 import socket
 import subprocess
 import sys
@@ -86,6 +87,9 @@ SELECTORS = {
         (By.CSS_SELECTOR, "a[href*='/messaging/']"),
         (By.CSS_SELECTOR, "input.search-global-typeahead__input"),
         (By.CSS_SELECTOR, ".global-nav__me"),
+        (By.CSS_SELECTOR, "nav.global-nav"),
+        (By.CSS_SELECTOR, "header.global-nav"),
+        (By.CSS_SELECTOR, "main.scaffold-layout__main"),
     ],
     "typeahead_input": [(By.CSS_SELECTOR, "input.msg-connections-typeahead__search-field")],
     "recipient_chip_any": [
@@ -623,17 +627,49 @@ def _linkedin_auth_cookies() -> set[str]:
         return set()
 
 
+def _linkedin_logged_in_url(url: str) -> bool:
+    """True when the browser is on a post-login LinkedIn surface (incl. /feed/foryou)."""
+    u = (url or "").lower()
+    if "linkedin.com" not in u:
+        return False
+    if any(
+        token in u
+        for token in (
+            "login",
+            "authwall",
+            "checkpoint",
+            "uas/login",
+            "signup",
+            "join/",
+        )
+    ):
+        return False
+    if "/feed" in u:
+        return True
+    if "/messaging" in u:
+        return True
+    if "/mynetwork" in u:
+        return True
+    if "/notifications" in u:
+        return True
+    if re.search(r"linkedin\.com/in/[^/?#]+", u):
+        return True
+    return False
+
+
 def _is_logged_in(timeout: int = 5) -> bool:
     """True if LinkedIn session cookie exists or feed chrome is visible."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         url = (driver.current_url or "").lower()
+        if _linkedin_logged_in_url(url):
+            return True
         names = _linkedin_auth_cookies()
         if ("li_at" in names or "liap" in names) and "login" not in url and "authwall" not in url:
             return True
         try:
             wait_for_any(driver, SELECTORS["login_ok_any"], EC.presence_of_element_located, 2)
-            if "login" not in url:
+            if "login" not in url and "authwall" not in url:
                 return True
         except TimeoutException:
             pass
@@ -741,6 +777,10 @@ def login_to_linkedin(email: str, password: str) -> None:
     print("Signing in to LinkedIn…")
     driver.get("https://www.linkedin.com/login")
     interruptible_sleep(2)
+    if _is_logged_in(10):
+        print("Already logged in — continuing.")
+        _raise_if_linkedin_limited()
+        return
 
     try:
         user_el = wait_for_any(driver, SELECTORS["login_username"], EC.visibility_of_element_located, TIMEOUTS["ui"])
@@ -771,6 +811,10 @@ def login_to_linkedin(email: str, password: str) -> None:
         print("Login not finished yet — complete any extra LinkedIn check in Chrome if shown.")
         _wait_for_manual_login(180)
     except TimeoutException:
+        if _is_logged_in(5):
+            print("Already logged in — continuing.")
+            _raise_if_linkedin_limited()
+            return
         _dump_login_debug("Could not fill LinkedIn login form")
         print("[WARN] Could not fill the login form. Complete sign-in in Chrome.")
         _wait_for_manual_login(180)

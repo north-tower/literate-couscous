@@ -14,7 +14,7 @@
 **Current state:**
 
 - `automate`: Launch → `jobs._spawn()` runs `worker.py` on the **same machine as Flask** (today often the VPS).
-- `my-electron-app`: Electron 45 stub (`package.json` only; no main process yet).
+- `my-electron-app`: Electron 45 shell — `electron/main.js`, config, preload (Phase 2.1); main window (Phase 2.2); agent loop + tray (Phase 2.3–2.5); bundled worker path (Phase 3.2).
 
 ---
 
@@ -60,56 +60,56 @@
 
 ### 1.1 Data model
 
-- [ ] **1.1.1** Add migration: `users.execution_mode TEXT NOT NULL DEFAULT 'server'` (`server` | `local`).
-- [ ] **1.1.2** Add table `agent_tokens` (id, user_id, label, token_hash, created_at, last_seen_at, revoked_at).
-- [ ] **1.1.3** Add helper `db.get_execution_mode(user_id)` and admin override if needed.
-- [ ] **1.1.4** Document how to set a user to `local` (SQL or admin UI later).
+- [x] **1.1.1** Add migration: `users.execution_mode TEXT NOT NULL DEFAULT 'server'` (`server` | `local`).
+- [x] **1.1.2** Add table `agent_tokens` (id, user_id, label, token_hash, created_at, last_seen_at, revoked_at).
+- [x] **1.1.3** Add helper `db.get_execution_mode(user_id)` and admin override if needed.
+- [x] **1.1.4** Document how to set a user to `local` (SQL or admin UI later). → [sendline-desktop-phase-1-1-data-model.md](./sendline-desktop-phase-1-1-data-model.md)
 
 ### 1.2 Agent authentication
 
-- [ ] **1.2.1** Implement `auth.agent_required` decorator (Bearer token → user_id).
-- [ ] **1.2.2** `POST /api/agent/register` (session login + CSRF): body `{ label }` → returns `{ token }` once (store hash only).
-- [ ] **1.2.3** `POST /api/agent/revoke` — revoke token by id (session auth).
-- [ ] **1.2.4** `GET /api/agent/tokens` — list tokens for current user (masked, no secret).
-- [ ] **1.2.5** Rate-limit agent register (reuse login rate limit patterns).
+- [x] **1.2.1** Implement `auth.agent_required` decorator (Bearer token → user_id).
+- [x] **1.2.2** `POST /api/agent/register` (session login + CSRF): body `{ label }` → returns `{ token }` once (store hash only).
+- [x] **1.2.3** `POST /api/agent/revoke` — revoke token by id (session auth).
+- [x] **1.2.4** `GET /api/agent/tokens` — list tokens for current user (masked, no secret).
+- [x] **1.2.5** Rate-limit agent register (reuse login rate limit patterns). → [sendline-desktop-phase-1-2-agent-auth.md](./sendline-desktop-phase-1-2-agent-auth.md)
 
 ### 1.3 Job payload for local runs
 
-- [ ] **1.3.1** Extract shared logic from `jobs._write_job_payload` → `jobs.build_job_payload(user_id, job_id)` (run + secrets + proxy).
-- [ ] **1.3.2** For `local` users on enqueue: write `run.json` on server **optional** (or skip); keep job row in DB.
-- [ ] **1.3.3** Include in agent work response: `people_names`, `message_template`, attachment metadata.
-- [ ] **1.3.4** Attachment delivery: signed `GET /api/agent/jobs/<id>/attachment` or time-limited token URL.
-- [ ] **1.3.5** LinkedIn credentials: decrypt in agent work response only; never log username/password.
-- [ ] **1.3.6** Proxy: call `egress.assign_proxy(user_id)` when building work bundle (same as today).
-- [ ] **1.3.7** Ledger: agent uses local path only; document server sync as future work.
+- [x] **1.3.1** Extract shared logic from `jobs._write_job_payload` → `jobs.build_job_payload(user_id, job_id)` (run + secrets + proxy).
+- [x] **1.3.2** For `local` users on enqueue: write `run.json` on server **optional** (or skip); keep job row in DB.
+- [x] **1.3.3** Include in agent work response: `people_names`, `message_template`, attachment metadata.
+- [x] **1.3.4** Attachment delivery: signed `GET /api/agent/jobs/<id>/attachment` or time-limited token URL.
+- [x] **1.3.5** LinkedIn credentials: decrypt in agent work response only; never log username/password.
+- [x] **1.3.6** Proxy: call `egress.assign_proxy(user_id)` when building work bundle (same as today).
+- [x] **1.3.7** Ledger: agent uses local path only; document server sync as future work. → [sendline-desktop-phase-1-3-job-payload.md](./sendline-desktop-phase-1-3-job-payload.md)
 
 ### 1.4 Agent work lifecycle API
 
-- [ ] **1.4.1** `GET /api/agent/work` — if user has `queued` job and no active claim, return work bundle + mark `running` + `started_at`.
-- [ ] **1.4.2** Idempotency: if same agent polls while already `running` for that user, return in-progress job + cursor.
-- [ ] **1.4.3** `POST /api/agent/logs` — body `{ job_id, lines: string[] }` → `append_log`.
-- [ ] **1.4.4** `POST /api/agent/heartbeat` — body `{ worker_version?, agent_version? }` → update `last_seen_at`.
-- [ ] **1.4.5** `POST /api/agent/complete` — body `{ job_id, exit_code }` → map exit codes like `jobs._watch` (0→done, 75→paused, 130→cancelled, etc.).
-- [ ] **1.4.6** `GET /api/agent/stop/<job_id>` or flag in work poll — agent sees stop requested.
+- [x] **1.4.1** `GET /api/agent/work` — if user has `queued` job and no active claim, return work bundle + mark `running` + `started_at`.
+- [x] **1.4.2** Idempotency: if same agent polls while already `running` for that user, return in-progress job + cursor.
+- [x] **1.4.3** `POST /api/agent/logs` — body `{ job_id, lines: string[] }` → `append_log`.
+- [x] **1.4.4** `POST /api/agent/heartbeat` — body `{ worker_version?, agent_version? }` → update `last_seen_at`.
+- [x] **1.4.5** `POST /api/agent/complete` — body `{ job_id, exit_code }` → map exit codes like `jobs._watch` (0→done, 75→paused, 130→cancelled, etc.).
+- [x] **1.4.6** `GET /api/agent/stop/<job_id>` or flag in work poll — agent sees stop requested. → [sendline-desktop-phase-1-4-agent-lifecycle.md](./sendline-desktop-phase-1-4-agent-lifecycle.md)
 
 ### 1.5 Change server worker dispatch
 
-- [ ] **1.5.1** In `jobs.start_next` / `_spawn`: skip `Popen(worker.py)` when job user `execution_mode == 'local'`.
-- [ ] **1.5.2** Adjust global queue: for `local` users, “busy” = open job in `running`/`stopping` for that user (not VPS Chrome FIFO).
-- [ ] **1.5.3** Keep `server` mode behavior unchanged (`_spawn` on VPS).
-- [ ] **1.5.4** Update `request_stop`: set DB `stopping`; agent writes local `stop` file (document contract).
+- [x] **1.5.1** In `jobs.start_next` / `_spawn`: skip `Popen(worker.py)` when job user `execution_mode == 'local'`.
+- [x] **1.5.2** Adjust global queue: for `local` users, “busy” = open job in `running`/`stopping` for that user (not VPS Chrome FIFO).
+- [x] **1.5.3** Keep `server` mode behavior unchanged (`_spawn` on VPS).
+- [x] **1.5.4** Update `request_stop`: set DB `stopping`; agent writes local `stop` file (document contract). → [sendline-desktop-phase-1-5-dispatch.md](./sendline-desktop-phase-1-5-dispatch.md)
 
 ### 1.6 API / UI feedback
 
-- [ ] **1.6.1** `GET /api/status` or `/api/me`: include `execution_mode`, `agent_online` (heartbeat within 60s).
-- [ ] **1.6.2** `POST /api/run` for `local` + offline agent: return 503 or 202 with clear error message.
-- [ ] **1.6.3** Optional banner in `static/app.js`: “Open Sendline Desktop to run campaigns.”
+- [x] **1.6.1** `GET /api/status` or `/api/me`: include `execution_mode`, `agent_online` (heartbeat within 60s).
+- [x] **1.6.2** `POST /api/run` for `local` + offline agent: return 503 or 202 with clear error message.
+- [x] **1.6.3** Optional banner in `static/app.js`: “Open Sendline Desktop to run campaigns.” → [sendline-desktop-phase-1-6-api-ui-feedback.md](./sendline-desktop-phase-1-6-api-ui-feedback.md)
 
 ### 1.7 Dev agent script (prove backend before Electron)
 
-- [ ] **1.7.1** Add `scripts/agent_dev.py`: register token, poll work, write local dirs, spawn `worker.py`, post logs/complete.
-- [ ] **1.7.2** README section: run agent_dev + set user to `local`.
-- [ ] **1.7.3** Manual test checklist: Launch, log stream, Stop, attachment, proxy line in log, exit codes.
+- [x] **1.7.1** Add `scripts/agent_dev.py`: register token, poll work, write local dirs, spawn `worker.py`, post logs/complete.
+- [x] **1.7.2** README section: run agent_dev + set user to `local`. → [sendline-desktop-phase-1-7-dev-agent.md](./sendline-desktop-phase-1-7-dev-agent.md), [README.md](../README.md)
+- [x] **1.7.3** Manual test checklist: Launch, log stream, Stop, attachment, proxy line in log, exit codes. → [sendline-desktop-phase-1-7-dev-agent.md](./sendline-desktop-phase-1-7-dev-agent.md)
 
 ---
 
@@ -121,44 +121,44 @@
 
 ### 2.1 Project scaffold
 
-- [ ] **2.1.1** Add `electron/main.js` (or `main.mjs`), set `package.json` `"main"`.
-- [ ] **2.1.2** Add scripts: `"start": "electron ."`, `"dev": "electron . --enable-logging"`.
-- [ ] **2.1.3** Add `electron/preload.js` with `contextIsolation: true`, `nodeIntegration: false`.
-- [ ] **2.1.4** Add `electron/config.js` — `SENDLINE_API_URL`, paths via `app.getPath('userData')`.
-- [ ] **2.1.5** Add `.env.example` for API URL (load with dotenv in main only).
+- [x] **2.1.1** Add `electron/main.js` (or `main.mjs`), set `package.json` `"main"`.
+- [x] **2.1.2** Add scripts: `"start": "electron ."`, `"dev": "electron . --enable-logging"`.
+- [x] **2.1.3** Add `electron/preload.js` with `contextIsolation: true`, `nodeIntegration: false`.
+- [x] **2.1.4** Add `electron/config.js` — `SENDLINE_API_URL`, paths via `app.getPath('userData')`.
+- [x] **2.1.5** Add `.env.example` for API URL (load with dotenv in main only).
 
 ### 2.2 Main window
 
-- [ ] **2.2.1** Create `BrowserWindow` (min size, title “Sendline”).
-- [ ] **2.2.2** `loadURL(SENDLINE_API_URL)` — login page first.
-- [ ] **2.2.3** Handle external links (open in system browser).
-- [ ] **2.2.4** Optional: single-instance lock (second launch focuses existing window).
+- [x] **2.2.1** Create `BrowserWindow` (min size, title “Sendline”).
+- [x] **2.2.2** `loadURL(SENDLINE_API_URL)` — login page first.
+- [x] **2.2.3** Handle external links (open in system browser).
+- [x] **2.2.4** Optional: single-instance lock (second launch focuses existing window).
 
 ### 2.3 Agent runner (main process)
 
-- [ ] **2.3.1** Add `electron/agent-runner.js` — state machine: idle | running | stopping.
-- [ ] **2.3.2** Load agent token from config file or env (Phase 4 moves to secure storage).
-- [ ] **2.3.3** Poll `GET /api/agent/work` every 2–3s when idle.
-- [ ] **2.3.4** On job: create `userData/jobs/<job_id>/`, write `run.json`, `secrets.json`.
-- [ ] **2.3.5** Download attachment to `userData/attachments/`; fix path in `run.json`.
-- [ ] **2.3.6** Set `userData/chrome` as `--user-data-dir`.
-- [ ] **2.3.7** Spawn worker: dev = `py -u ../automate/worker.py` with args (configurable path).
-- [ ] **2.3.8** Pipe stdout/stderr → batch POST `/api/agent/logs`.
-- [ ] **2.3.9** Poll stop flag; write `job_dir/stop` when server says stopping.
-- [ ] **2.3.10** On process exit → POST `/api/agent/complete`.
-- [ ] **2.3.11** Heartbeat every 30s while app open.
-- [ ] **2.3.12** Handle worker crash / non-zero exit without hanging agent loop.
+- [x] **2.3.1** Add `electron/agent-runner.js` — state machine: idle | running | stopping.
+- [x] **2.3.2** Load agent token from config file or env (Phase 4 moves to secure storage).
+- [x] **2.3.3** Poll `GET /api/agent/work` every 2–3s when idle.
+- [x] **2.3.4** On job: create `userData/jobs/<job_id>/`, write `run.json`, `secrets.json`.
+- [x] **2.3.5** Download attachment to `userData/attachments/`; fix path in `run.json`.
+- [x] **2.3.6** Set `userData/chrome` as `--user-data-dir`.
+- [x] **2.3.7** Spawn worker: dev = `py -u ../automate/worker.py` with args (configurable path).
+- [x] **2.3.8** Pipe stdout/stderr → batch POST `/api/agent/logs`.
+- [x] **2.3.9** Poll stop flag; write `job_dir/stop` when server says stopping.
+- [x] **2.3.10** On process exit → POST `/api/agent/complete`.
+- [x] **2.3.11** Heartbeat every 30s while app open.
+- [x] **2.3.12** Handle worker crash / non-zero exit without hanging agent loop.
 
 ### 2.4 Tray + status
 
-- [ ] **2.4.1** System tray icon (connected / running / error).
-- [ ] **2.4.2** Tray menu: Open Sendline, Quit (disabled or confirm while running).
-- [ ] **2.4.3** Expose `agentStatus` to renderer via preload (`connected`, `running`, `job_id`).
+- [x] **2.4.1** System tray icon (connected / running / error).
+- [x] **2.4.2** Tray menu: Open Sendline, Quit (disabled or confirm while running).
+- [x] **2.4.3** Expose `agentStatus` to renderer via preload (`connected`, `running`, `job_id`).
 
 ### 2.5 First-run / settings (minimal)
 
-- [ ] **2.5.1** If no token: show small local settings window OR prompt in tray menu (API URL + paste token).
-- [ ] **2.5.2** Link to hosted UI: “Generate desktop token” (after Phase 1 register UI or doc).
+- [x] **2.5.1** If no token: show small local settings window OR prompt in tray menu (API URL + paste token).
+- [x] **2.5.2** Link to hosted UI: “Generate desktop token” (after Phase 1 register UI or doc).
 
 ### 2.6 Integration test (manual)
 
@@ -175,18 +175,18 @@
 
 ### 3.1 PyInstaller spec (`automate/`)
 
-- [ ] **3.1.1** Add `sendline-worker.spec` targeting `worker.py` entrypoint.
-- [ ] **3.1.2** Include hidden imports: `selenium`, `pyperclip`, `egress`, `pace`, `cryptography` if needed.
-- [ ] **3.1.3** One-file vs one-folder: prefer **one-folder** in `dist/sendline-worker/` for faster startup (document choice).
-- [ ] **3.1.4** Add `scripts/build-worker.ps1` for CI/local build.
-- [ ] **3.1.5** Embed `WORKER_VERSION` in build (env or git sha).
+- [x] **3.1.1** Add `sendline-worker.spec` targeting `worker.py` entrypoint.
+- [x] **3.1.2** Include hidden imports: `selenium`, `pyperclip`, `egress`, `pace`, `cryptography` if needed.
+- [x] **3.1.3** One-file vs one-folder: prefer **one-folder** in `dist/sendline-worker/` for faster startup (document choice).
+- [x] **3.1.4** Add `scripts/build-worker.ps1` for CI/local build.
+- [x] **3.1.5** Embed `WORKER_VERSION` in build (env or git sha).
 
 ### 3.2 Electron consumes bundled worker
 
-- [ ] **3.2.1** Copy worker artifact to `my-electron-app/resources/sendline-worker/` in build script.
-- [ ] **3.2.2** Resolve path: dev → `py worker.py`; prod → `process.resourcesPath/.../sendline-worker.exe`.
-- [ ] **3.2.3** Pass `--debug-port 9222` (document single-user per machine).
-- [ ] **3.2.4** Heartbeat sends `worker_version` to server.
+- [x] **3.2.1** Copy worker artifact to `my-electron-app/resources/sendline-worker/` in build script.
+- [x] **3.2.2** Resolve path: dev → `py worker.py`; prod → `process.resourcesPath/.../sendline-worker.exe`.
+- [x] **3.2.3** Pass `--debug-port 9222` (document single-user per machine).
+- [x] **3.2.4** Heartbeat sends `worker_version` to server.
 
 ### 3.3 Verify on clean machine
 
@@ -204,23 +204,23 @@
 
 ### 4.1 electron-builder
 
-- [ ] **4.1.1** Add `electron-builder` devDependency and `build` config in `package.json`.
-- [ ] **4.1.2** App ID, product name “Sendline Desktop”, NSIS target.
-- [ ] **4.1.3** `extraResources` for worker bundle.
-- [ ] **4.1.4** Icons (`.ico` multi-size).
-- [ ] **4.1.5** Script: `pnpm run dist:win`.
+- [x] **4.1.1** Add `electron-builder` devDependency and `build` config in `package.json`.
+- [x] **4.1.2** App ID, product name “Sendline Desktop”, NSIS target.
+- [x] **4.1.3** `extraResources` for worker bundle.
+- [x] **4.1.4** Icons (`.ico` multi-size).
+- [x] **4.1.5** Script: `pnpm run dist:win`. → `my-electron-app/docs/sendline-desktop-phase-4-1-electron-builder.md`
 
 ### 4.2 Code signing (Windows)
 
-- [ ] **4.2.1** Obtain code signing cert (EV or standard).
-- [ ] **4.2.2** Configure `signtool` / electron-builder `certificateSubjectName`.
-- [ ] **4.2.3** Test install on machine without dev tools.
+- [ ] **4.2.1** Obtain code signing cert (EV or standard). → `my-electron-app/docs/sendline-desktop-phase-4-2-code-signing.md` §4.2.1 (operator checklist)
+- [x] **4.2.2** Configure `signtool` / electron-builder `certificateSubjectName`. → `my-electron-app/docs/sendline-desktop-phase-4-2-code-signing.md` §4.2.2
+- [ ] **4.2.3** Test install on machine without dev tools. → same doc §4.2.3 (after signed build)
 
 ### 4.3 Token registration UX
 
-- [ ] **4.3.1** Hosted UI page or modal: “Link this computer” → calls `POST /api/agent/register` → show token once.
-- [ ] **4.3.2** Electron settings: paste token → store with `safeStorage.encryptString` (or `keytar`).
-- [ ] **4.3.3** Revoke token from UI lists in `/api/agent/tokens`.
+- [x] **4.3.1** Hosted UI page or modal: “Link this computer” → calls `POST /api/agent/register` → show token once. → `my-electron-app/docs/sendline-desktop-phase-4-3-token-ux.md`
+- [x] **4.3.2** Electron settings: paste token → store with `safeStorage.encryptString` (or `keytar`).
+- [x] **4.3.3** Revoke token from UI lists in `/api/agent/tokens`.
 
 ### 4.4 Auto-start & updates
 

@@ -268,6 +268,15 @@ body.app-shell {
   font: inherit;
 }
 
+.app-nav__link--linked {
+  color: var(--ok);
+}
+
+.app-nav__link--linked:hover {
+  color: var(--ok);
+  opacity: 0.88;
+}
+
 .app-header__end {
   display: flex;
   align-items: center;
@@ -276,10 +285,14 @@ body.app-shell {
   flex-shrink: 0;
 }
 
-/* Signed in: display name + log out only */
+/* Signed in: display name + log out only (nav links hidden; Desktop stays in header end) */
 body.user-signed-in .brand-lockup,
 body.user-signed-in .app-nav {
   display: none;
+}
+
+body.user-signed-in #desktopNavBtn:not([hidden]) {
+  display: inline-flex;
 }
 
 body.user-signed-in.app-shell .page-intro {
@@ -323,6 +336,204 @@ body.user-signed-in .user-chip:not([hidden]) {
   font-size: 0.88rem;
   line-height: 1.45;
   color: var(--ink-soft);
+}
+
+.desktop-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.desktop-banner__action {
+  margin-left: auto;
+}
+
+.desktop-agent-config-status[data-tone="ok"] {
+  color: var(--ok, #0d7a4a);
+}
+
+.desktop-agent-config-status[data-tone="error"] {
+  color: var(--danger, #b42318);
+}
+
+.desktop-dialog {
+  border: none;
+  border-radius: 0.85rem;
+  padding: 0;
+  max-width: min(32rem, calc(100vw - 2rem));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.desktop-dialog::backdrop {
+  background: rgba(8, 10, 18, 0.55);
+}
+
+.desktop-dialog__panel {
+  padding: 1.25rem 1.35rem 1.35rem;
+  margin: 0;
+}
+
+.desktop-dialog--linked-only .desktop-dialog__panel {
+  padding-bottom: 1.15rem;
+}
+
+.desktop-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.desktop-dialog__title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.desktop-dialog__close {
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0.15rem 0.45rem;
+}
+
+.desktop-dialog__lead {
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.desktop-dialog__status {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.desktop-dialog__status[data-tone="ok"] {
+  color: var(--ok, #0a7a3e);
+}
+
+.desktop-dialog__status[data-tone="error"] {
+  color: var(--danger, #b42318);
+}
+
+.desktop-dialog__actions {
+  margin-top: 1rem;
+}
+
+.desktop-dialog__reveal {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.desktop-dialog__reveal textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  background: var(--bg, #fff);
+  color: var(--ink);
+}
+
+.desktop-dialog__list-wrap {
+  margin-top: 1.25rem;
+}
+
+.desktop-dialog__subhead {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+}
+
+.desktop-token-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.desktop-token-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  font-size: 0.85rem;
+}
+
+.desktop-token-item__label {
+  font-weight: 600;
+}
+
+.desktop-token-item__meta {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.desktop-token-item .text-btn {
+  margin-left: auto;
+}
+
+.desktop-onboarding__field {
+  margin: 0 0 1rem;
+}
+
+.desktop-onboarding__field input {
+  width: 100%;
+}
+
+body.desktop-onboarding-blocked .stage--app {
+  pointer-events: none;
+  user-select: none;
+  filter: saturate(0.88) brightness(0.96);
+}
+
+.desktop-onboarding::backdrop {
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+.desktop-onboarding__head {
+  align-items: flex-start;
+}
+
+.desktop-onboarding__steps {
+  margin: 0.35rem 0 0;
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.desktop-onboarding__step.is-active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.desktop-onboarding__step.is-done {
+  color: var(--ink);
+}
+
+.desktop-banner[hidden] {
+  display: none !important;
 }
 
 .noise {
@@ -640,6 +851,10 @@ body.app-shell .stage--app {
 }
 
 .meta.tip { opacity: 0.85; }
+
+.insert-name-chip {
+  display: none;
+}
 
 .count-pill {
   min-width: auto;
@@ -2291,6 +2506,18 @@ body.app-shell .admin-stage.stage--app {
   font-weight: 600;
 }
 
+.panel-stack {
+  display: contents;
+}
+
+.panel-footer-shell {
+  display: contents;
+}
+
+.panel-footer-fade {
+  display: none;
+}
+
 .brand-user .btn.primary {
   text-decoration: none;
   display: inline-flex;
@@ -2298,4 +2525,364 @@ body.app-shell .admin-stage.stage--app {
   justify-content: center;
   min-width: 0;
   padding: 0.5rem 0.95rem;
+}
+
+/* —— Sendline Desktop (Electron) native shell —— */
+html.is-sendline-desktop {
+  --desktop-header-height: 44px;
+  --desktop-scrollbar-size: 8px;
+  --desktop-actions-gap: 0.85rem;
+}
+
+body.is-sendline-desktop {
+  --font-body: "Segoe UI", system-ui, sans-serif;
+}
+
+body.is-sendline-desktop .noise,
+body.is-sendline-desktop .orb {
+  display: none !important;
+}
+
+body.is-sendline-desktop .app-header {
+  height: var(--desktop-header-height);
+  min-height: var(--desktop-header-height);
+  padding: 0;
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+body.is-sendline-desktop .app-header a,
+body.is-sendline-desktop .app-header button,
+body.is-sendline-desktop .app-header input,
+body.is-sendline-desktop .app-header select,
+body.is-sendline-desktop .app-header textarea,
+body.is-sendline-desktop .user-chip {
+  -webkit-app-region: no-drag;
+}
+
+body.is-sendline-desktop .app-header__inner {
+  width: calc(100% - 2 * var(--layout-gutter));
+  max-width: none;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0;
+  padding-right: calc(100vw - env(titlebar-area-width, calc(100vw - 140px)));
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.65rem;
+}
+
+body.is-sendline-desktop .app-nav,
+body.is-sendline-desktop #adminLink {
+  display: none !important;
+}
+
+body.is-sendline-desktop .brand-lockup {
+  flex-shrink: 0;
+}
+
+body.is-sendline-desktop .app-header .brand-mark {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+body.is-sendline-desktop .app-header .brand-icon {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 8px;
+}
+
+body.is-sendline-desktop.user-signed-in .brand-lockup {
+  display: inline-flex;
+  order: 1;
+}
+
+body.is-sendline-desktop.user-signed-in .user-chip {
+  order: 3;
+  margin-left: 0;
+}
+
+body.is-sendline-desktop.user-signed-in .app-header__end {
+  order: 4;
+  margin-left: 0;
+}
+
+body.is-sendline-desktop .desktop-linked-chip {
+  order: 2;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--ok-soft);
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  font: 600 0.84rem/1.2 var(--font-body);
+  color: var(--ok);
+  -webkit-app-region: no-drag;
+}
+
+body.is-sendline-desktop .desktop-linked-chip[hidden] {
+  display: none !important;
+}
+
+body.is-sendline-desktop #logoutBtn {
+  font: 600 0.84rem/1.2 var(--font-body);
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(19, 78, 74, 0.14);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--accent-deep);
+}
+
+body.is-sendline-desktop #logoutBtn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+body.is-sendline-desktop .page-intro {
+  display: none;
+}
+
+body.is-sendline-desktop .stage--app {
+  width: min(1200px, calc(100% - 2 * var(--layout-gutter)));
+  max-width: 1200px;
+  padding-top: 0.65rem;
+  padding-bottom: calc(28px + 0.5rem);
+}
+
+body.is-sendline-desktop .desktop-statusbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.85rem;
+  font: 500 0.72rem/1 var(--font-body);
+  color: var(--ink-soft);
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+body.is-sendline-desktop .desktop-statusbar[hidden] {
+  display: none !important;
+}
+
+body.is-sendline-desktop .desktop-statusbar__text {
+  -webkit-app-region: no-drag;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.is-sendline-desktop .desktop-statusbar[data-tone="linked"] .desktop-statusbar__text {
+  color: var(--accent-deep);
+}
+
+body.is-sendline-desktop .desktop-statusbar[data-tone="warn"] .desktop-statusbar__text {
+  color: var(--warn);
+}
+
+body.is-sendline-desktop .desktop-statusbar[data-tone="error"] .desktop-statusbar__text {
+  color: var(--danger);
+}
+
+body.is-sendline-desktop .desktop-statusbar__version {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: rgba(71, 85, 105, 0.85);
+  -webkit-app-region: no-drag;
+}
+
+body.is-sendline-desktop .panel-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+body.is-sendline-desktop .panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0;
+  padding-bottom: calc(5.5rem + var(--desktop-actions-gap));
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+}
+
+body.is-sendline-desktop .panel-scroll::-webkit-scrollbar {
+  width: var(--desktop-scrollbar-size);
+}
+
+body.is-sendline-desktop .panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.is-sendline-desktop .panel-scroll::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+body.is-sendline-desktop .panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.42);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+body.is-sendline-desktop .panel-footer-shell {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: var(--desktop-scrollbar-size);
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+body.is-sendline-desktop .panel-footer-fade {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 2rem;
+  background: linear-gradient(to bottom, transparent, var(--paper));
+  pointer-events: none;
+}
+
+body.is-sendline-desktop .panel-footer-shell .actions-card {
+  pointer-events: auto;
+  margin-top: 0;
+}
+
+body.is-sendline-desktop .log-panel .window-dots {
+  display: none;
+}
+
+body.is-sendline-desktop .log-panel .pulse[data-state="idle"] {
+  background: #64748b;
+  animation: none;
+  box-shadow: none;
+}
+
+body.is-sendline-desktop .log-panel .pulse[data-state="running"] {
+  background: var(--accent);
+  animation: beat 1.2s ease-out infinite;
+}
+
+body.is-sendline-desktop .log-panel .pulse[data-state="error"] {
+  background: #dc2626;
+  animation: none;
+  box-shadow: none;
+}
+
+body.is-sendline-desktop .log-empty svg {
+  display: none;
+}
+
+body.is-sendline-desktop .log-empty-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #6b857c;
+}
+
+body.is-sendline-desktop #namesField > .field-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+}
+
+body.is-sendline-desktop .insert-name-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.65rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(19, 78, 74, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  font: 600 0.72rem/1 var(--font-mono);
+  color: var(--accent-deep);
+  cursor: pointer;
+}
+
+body.is-sendline-desktop .insert-name-chip:hover {
+  background: var(--accent-soft);
+}
+
+body.is-sendline-desktop #messageField .meta.tip {
+  display: none;
+}
+
+body.is-sendline-desktop textarea,
+body.is-sendline-desktop input[type="text"],
+body.is-sendline-desktop input[type="password"],
+body.is-sendline-desktop input[type="email"],
+body.is-sendline-desktop input[type="url"],
+body.is-sendline-desktop select {
+  background: #ffffff;
+  border: 1px solid rgba(19, 78, 74, 0.16);
+  border-radius: 10px;
+}
+
+body.is-sendline-desktop textarea::placeholder,
+body.is-sendline-desktop input::placeholder {
+  color: rgba(71, 85, 105, 0.72);
+}
+
+body.is-sendline-desktop textarea:focus,
+body.is-sendline-desktop input[type="text"]:focus,
+body.is-sendline-desktop input[type="password"]:focus,
+body.is-sendline-desktop input[type="email"]:focus,
+body.is-sendline-desktop input[type="url"]:focus,
+body.is-sendline-desktop select:focus {
+  border-color: #14b8a6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+}
+
+body.is-sendline-desktop #names:focus,
+body.is-sendline-desktop #message:focus {
+  background: #fff;
+}
+
+body.is-sendline-desktop.auth-page .app-header {
+  height: var(--desktop-header-height);
+  padding: 0;
+}
+
+body.is-sendline-desktop.auth-page .app-header__inner {
+  height: 100%;
+  padding-right: calc(100vw - env(titlebar-area-width, calc(100vw - 140px)));
+}
+
+body.is-sendline-desktop.auth-page .auth-panel-lead {
+  max-width: 28rem;
+}
+
+body.is-sendline-desktop.auth-page #headerLoginBtn {
+  display: none;
 }

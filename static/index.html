@@ -13,10 +13,6 @@
 
   <header class="app-header">
     <div class="app-header__inner">
-      <span class="user-chip" id="userChip" hidden>
-        <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
-        <span class="user-email" id="userEmail"></span>
-      </span>
       <a class="brand-lockup brand-lockup--link" href="/">
         <span class="brand-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -32,7 +28,13 @@
         <a class="app-nav__link" href="/terms">Terms</a>
         <a class="app-nav__link" id="adminLink" href="/admin" hidden>Admin</a>
       </nav>
+      <span class="desktop-linked-chip" id="desktopLinkedChip" hidden role="status">Linked</span>
+      <span class="user-chip" id="userChip" hidden>
+        <span class="user-avatar" id="userAvatar" aria-hidden="true"></span>
+        <span class="user-email" id="userEmail"></span>
+      </span>
       <div class="app-header__end">
+        <button type="button" class="app-nav__link app-nav__link--button" id="desktopNavBtn" hidden>Desktop</button>
         <button type="button" class="app-nav__link app-nav__link--button" id="logoutBtn">Log out</button>
       </div>
     </div>
@@ -44,8 +46,14 @@
       <p class="page-lead">Add people, write your message, then start sending.</p>
     </div>
 
+    <div class="desktop-banner" id="desktopBanner" hidden role="status">
+      <span id="desktopBannerText">Open Sendline Desktop on this PC, then paste your agent token in Desktop Settings.</span>
+      <button type="button" class="text-btn desktop-banner__action" id="desktopBannerLinkBtn">Link this PC</button>
+    </div>
+
     <section class="workspace" aria-label="Campaign controls">
       <div class="panel">
+        <div class="panel-stack">
         <div class="panel-scroll">
         <div class="card" id="linkedinField">
           <div class="linkedin-connected" id="linkedinConnectedView" hidden>
@@ -125,7 +133,8 @@
         <div class="card field" id="messageField">
           <div class="field-head">
             <label for="message">Message</label>
-            <span class="meta tip">use {name}</span>
+            <span class="meta tip" id="messageNameHint">use {name}</span>
+            <button type="button" class="insert-name-chip" id="insertNameBtn">{name}</button>
           </div>
           <textarea id="message" spellcheck="true" placeholder="Hi {name},"></textarea>
         </div>
@@ -150,6 +159,14 @@
           </div>
         </div>
 
+        <div class="card field compact" id="desktopLinkField" hidden>
+          <div class="field-head">
+            <span class="field-label">Sendline Desktop</span>
+          </div>
+          <p class="field-hint">Link this PC to run campaigns locally. Generate a token here, then paste it in the desktop app (tray → Settings).</p>
+          <button type="button" class="btn ghost" id="desktopWorkspaceBtn">Link this computer</button>
+        </div>
+
         <div class="card field compact" id="sendStyleField">
           <div class="field-head">
             <span class="field-label">How sending works</span>
@@ -160,16 +177,20 @@
         </div>
         </div>
 
-        <div class="actions-card">
-          <div class="actions">
-            <button type="button" class="btn ghost" id="saveBtn">Save</button>
-            <button type="button" class="btn danger" id="stopBtn" hidden>Stop</button>
-            <button type="button" class="btn primary" id="runBtn">
-              <span class="btn-label">Start sending</span>
-              <span class="btn-shine" aria-hidden="true"></span>
-            </button>
+        <div class="panel-footer-shell">
+          <div class="panel-footer-fade" aria-hidden="true"></div>
+          <div class="actions-card">
+            <div class="actions">
+              <button type="button" class="btn ghost" id="saveBtn">Save</button>
+              <button type="button" class="btn danger" id="stopBtn" hidden>Stop</button>
+              <button type="button" class="btn primary" id="runBtn">
+                <span class="btn-label">Start sending</span>
+                <span class="btn-shine" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="status" id="status" role="status"></p>
           </div>
-          <p class="status" id="status" role="status"></p>
+        </div>
         </div>
       </div>
 
@@ -193,13 +214,83 @@
               <circle cx="12" cy="12" r="9" />
             </svg>
             <p class="log-empty-title">No activity yet</p>
-            <p class="log-empty-hint">Progress appears here when you start sending.</p>
+            <p class="log-empty-hint" id="logEmptyHint">Progress appears here when you start sending.</p>
           </div>
           <pre id="log" class="log"></pre>
         </div>
       </aside>
     </section>
   </main>
+
+  <footer class="desktop-statusbar" id="desktopStatusBar" hidden role="status">
+    <span class="desktop-statusbar__text" id="desktopStatusText"></span>
+    <span class="desktop-statusbar__version" id="desktopStatusVersion"></span>
+  </footer>
+
+  <dialog class="desktop-dialog desktop-onboarding" id="desktopOnboardingDialog" aria-labelledby="desktopOnboardingTitle" aria-modal="true">
+    <div class="desktop-dialog__panel desktop-onboarding__panel">
+      <header class="desktop-dialog__head desktop-onboarding__head">
+        <div>
+          <h2 class="desktop-dialog__title" id="desktopOnboardingTitle">Link this PC</h2>
+          <p class="desktop-onboarding__steps" aria-hidden="true">
+            <span class="desktop-onboarding__step is-active" id="desktopOnboardingStep1Label">1. Link</span>
+            <span class="desktop-onboarding__step" id="desktopOnboardingStep2Label">2. Connect</span>
+          </p>
+        </div>
+      </header>
+      <div id="desktopOnboardingStep1">
+        <p class="desktop-dialog__lead">
+          Sendline Desktop runs campaigns in Chrome on this computer. Link this PC to your account before you use the campaign workspace.
+        </p>
+        <div class="field compact desktop-onboarding__field">
+          <label class="input-label" for="desktopOnboardingLabel">Computer name</label>
+          <input id="desktopOnboardingLabel" type="text" autocomplete="off" spellcheck="false" maxlength="120" placeholder="e.g. Office laptop" />
+          <p class="field-hint">Shown in your linked computers list on Sendline.</p>
+        </div>
+        <div class="desktop-dialog__status" id="desktopOnboardingStatus" hidden role="status"></div>
+        <div class="desktop-dialog__actions">
+          <button type="button" class="btn primary" id="desktopOnboardingLinkBtn">Link this PC</button>
+        </div>
+      </div>
+      <div id="desktopOnboardingStep2" hidden>
+        <p class="desktop-dialog__lead" id="desktopOnboardingStep2Lead">Saving and connecting this PC…</p>
+        <div class="desktop-dialog__status" id="desktopOnboardingStep2Status" hidden role="status"></div>
+        <div class="desktop-dialog__actions">
+          <button type="button" class="btn primary" id="desktopOnboardingContinueBtn" hidden disabled>Continue to campaigns</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="desktop-dialog" id="desktopDialog" aria-labelledby="desktopDialogTitle">
+    <form method="dialog" class="desktop-dialog__panel">
+      <header class="desktop-dialog__head">
+        <h2 class="desktop-dialog__title" id="desktopDialogTitle">Sendline Desktop</h2>
+        <button type="button" class="icon-btn desktop-dialog__close" id="desktopDialogClose" aria-label="Close">×</button>
+      </header>
+      <p class="desktop-dialog__lead" id="desktopDialogLead">
+        Generate an agent token here, paste it once into Sendline Desktop (tray → Settings), then keep the app open while you run campaigns.
+      </p>
+      <div class="desktop-dialog__status" id="desktopAgentStatus" hidden></div>
+      <div class="field compact" id="desktopRegisterLabelField">
+        <label class="input-label" for="desktopRegisterLabel">Computer name</label>
+        <input id="desktopRegisterLabel" type="text" autocomplete="off" spellcheck="false" maxlength="120" placeholder="e.g. Office laptop" />
+      </div>
+      <div class="desktop-dialog__actions">
+        <button type="button" class="btn primary" id="desktopRegisterBtn">Link this PC</button>
+      </div>
+      <div class="desktop-dialog__reveal" id="desktopTokenReveal" hidden>
+        <p class="field-hint">Copy this token now — it will not be shown again.</p>
+        <textarea id="desktopNewToken" readonly rows="3" spellcheck="false"></textarea>
+        <button type="button" class="btn ghost" id="desktopCopyTokenBtn">Copy token</button>
+      </div>
+      <div class="desktop-dialog__list-wrap">
+        <h3 class="desktop-dialog__subhead">Linked computers</h3>
+        <p class="field-hint" id="desktopTokenEmpty">No desktop tokens yet.</p>
+        <ul class="desktop-token-list" id="desktopTokenList" hidden></ul>
+      </div>
+    </form>
+  </dialog>
 
   <script src="/static/app.js"></script>
 </body>

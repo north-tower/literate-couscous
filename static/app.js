@@ -35,6 +35,39 @@ const userAvatarEl = document.getElementById("userAvatar");
 const userEmailEl = document.getElementById("userEmail");
 const adminLinkEl = document.getElementById("adminLink");
 const logoutBtn = document.getElementById("logoutBtn");
+const desktopBannerEl = document.getElementById("desktopBanner");
+const desktopBannerLinkBtn = document.getElementById("desktopBannerLinkBtn");
+const desktopNavBtn = document.getElementById("desktopNavBtn");
+const desktopWorkspaceBtn = document.getElementById("desktopWorkspaceBtn");
+const desktopLinkField = document.getElementById("desktopLinkField");
+const desktopDialogEl = document.getElementById("desktopDialog");
+const desktopDialogCloseBtn = document.getElementById("desktopDialogClose");
+const desktopRegisterBtn = document.getElementById("desktopRegisterBtn");
+const desktopTokenRevealEl = document.getElementById("desktopTokenReveal");
+const desktopNewTokenEl = document.getElementById("desktopNewToken");
+const desktopCopyTokenBtn = document.getElementById("desktopCopyTokenBtn");
+const desktopTokenListEl = document.getElementById("desktopTokenList");
+const desktopTokenEmptyEl = document.getElementById("desktopTokenEmpty");
+const desktopAgentStatusEl = document.getElementById("desktopAgentStatus");
+const desktopBannerTextEl = document.getElementById("desktopBannerText");
+const desktopOnboardingDialogEl = document.getElementById("desktopOnboardingDialog");
+const desktopOnboardingLinkBtn = document.getElementById("desktopOnboardingLinkBtn");
+const desktopOnboardingStatusEl = document.getElementById("desktopOnboardingStatus");
+const desktopOnboardingStep1El = document.getElementById("desktopOnboardingStep1");
+const desktopOnboardingStep2El = document.getElementById("desktopOnboardingStep2");
+const desktopOnboardingStep1LabelEl = document.getElementById("desktopOnboardingStep1Label");
+const desktopOnboardingStep2LabelEl = document.getElementById("desktopOnboardingStep2Label");
+const desktopOnboardingStep2LeadEl = document.getElementById("desktopOnboardingStep2Lead");
+const desktopOnboardingStep2StatusEl = document.getElementById("desktopOnboardingStep2Status");
+const desktopOnboardingContinueBtn = document.getElementById("desktopOnboardingContinueBtn");
+const desktopOnboardingLabelEl = document.getElementById("desktopOnboardingLabel");
+const desktopRegisterLabelEl = document.getElementById("desktopRegisterLabel");
+const desktopStatusBarEl = document.getElementById("desktopStatusBar");
+const desktopStatusTextEl = document.getElementById("desktopStatusText");
+const desktopStatusVersionEl = document.getElementById("desktopStatusVersion");
+const desktopLinkedChipEl = document.getElementById("desktopLinkedChip");
+const logEmptyHintEl = document.getElementById("logEmptyHint");
+const insertNameBtn = document.getElementById("insertNameBtn");
 const linkedinField = document.getElementById("linkedinField");
 const linkedinForm = document.getElementById("linkedinForm");
 const linkedinConnectedView = document.getElementById("linkedinConnectedView");
@@ -56,6 +89,14 @@ const LAST_COLUMN_KEYS = new Set([
   "second_name",
 ]);
 
+const isSendlineDesktop =
+  typeof window !== "undefined" &&
+  window.sendlineDesktop &&
+  typeof window.sendlineDesktop.saveAgentConfig === "function";
+
+/** @type {{ connected?: boolean; phase?: string; job_id?: number | null; last_error?: string | null } | null} */
+let lastDesktopAgentStatus = null;
+
 async function api(url, options = {}) {
   const res = await fetch(url, { credentials: "same-origin", ...options });
   if (res.status === 401) {
@@ -63,6 +104,450 @@ async function api(url, options = {}) {
     throw new Error("auth");
   }
   return res;
+}
+
+async function apiPostJson(url, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  return api(url, { method: "POST", headers, body: JSON.stringify(body) });
+}
+
+function formatAgentTime(unixSec) {
+  if (unixSec == null || Number.isNaN(Number(unixSec))) return "—";
+  const d = new Date(Number(unixSec) * 1000);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
+async function loadDesktopAgentConfigField() {
+  if (!isSendlineDesktop || !window.sendlineDesktop.getAgentConfig) return false;
+  try {
+    const data = await window.sendlineDesktop.getAgentConfig();
+    desktopHasToken = Boolean(data.hasToken);
+    updateDesktopNavLabel();
+    refreshDesktopLinkStatus();
+    return desktopHasToken;
+  } catch {
+    return false;
+  }
+}
+
+/** @param {{ apiUrl?: string; token?: string }} [overrides] */
+async function saveDesktopAgentConfig(overrides = {}) {
+  if (!isSendlineDesktop || !window.sendlineDesktop.saveAgentConfig) return null;
+  let apiUrl = String(overrides.apiUrl || "").trim();
+  const token = String(overrides.token || "").trim();
+  if (!apiUrl) {
+    try {
+      const cfg = await window.sendlineDesktop.getAgentConfig();
+      apiUrl = String(cfg.apiUrl || "").trim();
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!apiUrl) {
+    console.error("[sendline] saveDesktopAgentConfig: missing API URL");
+    return null;
+  }
+  try {
+    const result = await window.sendlineDesktop.saveAgentConfig({ apiUrl, token });
+    if (result) {
+      if (token) desktopHasToken = true;
+      else {
+        try {
+          const cfg = await window.sendlineDesktop.getAgentConfig();
+          desktopHasToken = Boolean(cfg.hasToken);
+        } catch {
+          /* keep prior */
+        }
+      }
+    }
+    updateDesktopNavLabel();
+    refreshDesktopLinkStatus();
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+function setDesktopDialogStatus(message, tone) {
+  if (!desktopAgentStatusEl) return;
+  if (!message) {
+    desktopAgentStatusEl.hidden = true;
+    desktopAgentStatusEl.textContent = "";
+    desktopAgentStatusEl.removeAttribute("data-tone");
+    return;
+  }
+  desktopAgentStatusEl.hidden = false;
+  desktopAgentStatusEl.textContent = message;
+  desktopAgentStatusEl.dataset.tone = tone || "ok";
+}
+
+function defaultDesktopAgentLabel() {
+  if (typeof navigator !== "undefined" && navigator.userAgent) {
+    return "Desktop (" + (navigator.platform || "PC") + ")";
+  }
+  return "Sendline Desktop";
+}
+
+/**
+ * @param {{ forOnboarding?: boolean; label?: string }} options
+ * @returns {string | null} null = user cancelled (browser prompt only)
+ */
+function resolveDesktopRegisterLabel(options = {}) {
+  if (typeof options.label === "string") {
+    const forced = options.label.trim();
+    if (forced) return forced;
+  }
+  if (options.forOnboarding && desktopOnboardingLabelEl) {
+    const fromOnboarding = desktopOnboardingLabelEl.value.trim();
+    if (fromOnboarding) return fromOnboarding;
+  }
+  if (desktopRegisterLabelEl) {
+    const fromDialog = desktopRegisterLabelEl.value.trim();
+    if (fromDialog) return fromDialog;
+  }
+  if (isSendlineDesktop) {
+    return defaultDesktopAgentLabel();
+  }
+  try {
+    const entered = window.prompt(
+      "Name this computer (shown in your token list):",
+      defaultDesktopAgentLabel()
+    );
+    if (entered == null) return null;
+    const trimmed = String(entered).trim();
+    return trimmed || null;
+  } catch {
+    return defaultDesktopAgentLabel();
+  }
+}
+
+function setOnboardingStatus(el, message, tone) {
+  if (!el) return;
+  if (!message) {
+    el.hidden = true;
+    el.textContent = "";
+    el.removeAttribute("data-tone");
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+  el.dataset.tone = tone || "ok";
+}
+
+function clearDesktopOnboardingPoll() {
+  if (desktopOnboardingPollTimer) {
+    clearTimeout(desktopOnboardingPollTimer);
+    desktopOnboardingPollTimer = null;
+  }
+}
+
+function resetDesktopOnboardingUi() {
+  clearDesktopOnboardingPoll();
+  if (desktopOnboardingStep1El) desktopOnboardingStep1El.hidden = false;
+  if (desktopOnboardingStep2El) desktopOnboardingStep2El.hidden = true;
+  if (desktopOnboardingStep1LabelEl) {
+    desktopOnboardingStep1LabelEl.classList.add("is-active");
+    desktopOnboardingStep1LabelEl.classList.remove("is-done");
+  }
+  if (desktopOnboardingStep2LabelEl) {
+    desktopOnboardingStep2LabelEl.classList.remove("is-active", "is-done");
+  }
+  if (desktopOnboardingStep2LeadEl) {
+    desktopOnboardingStep2LeadEl.textContent = "Saving and connecting this PC…";
+  }
+  setOnboardingStatus(desktopOnboardingStatusEl, "", "");
+  setOnboardingStatus(desktopOnboardingStep2StatusEl, "", "");
+  if (desktopOnboardingContinueBtn) {
+    desktopOnboardingContinueBtn.hidden = true;
+    desktopOnboardingContinueBtn.disabled = true;
+  }
+  if (desktopOnboardingLinkBtn) desktopOnboardingLinkBtn.disabled = false;
+  if (desktopOnboardingLabelEl) desktopOnboardingLabelEl.value = defaultDesktopAgentLabel();
+}
+
+function openDesktopOnboarding() {
+  if (!desktopOnboardingDialogEl || typeof desktopOnboardingDialogEl.showModal !== "function") return;
+  desktopOnboardingActive = true;
+  document.body.classList.add("desktop-onboarding-blocked");
+  resetDesktopOnboardingUi();
+  desktopOnboardingDialogEl.showModal();
+}
+
+function closeDesktopOnboarding() {
+  if (!desktopOnboardingDialogEl?.open) return;
+  clearDesktopOnboardingPoll();
+  desktopOnboardingActive = false;
+  document.body.classList.remove("desktop-onboarding-blocked");
+  desktopOnboardingDialogEl.close();
+}
+
+function maybeShowDesktopOnboarding() {
+  if (!isSendlineDesktop || desktopHasToken) return;
+  if (!document.body.classList.contains("user-signed-in")) return;
+  openDesktopOnboarding();
+}
+
+function finishDesktopOnboardingConnect() {
+  clearDesktopOnboardingPoll();
+  if (desktopOnboardingStep2LeadEl) {
+    desktopOnboardingStep2LeadEl.textContent = "This PC is linked. Keep Sendline Desktop open while you run campaigns.";
+  }
+  setOnboardingStatus(desktopOnboardingStep2StatusEl, "Connected to Sendline.", "ok");
+  if (desktopOnboardingStep2LabelEl) desktopOnboardingStep2LabelEl.classList.add("is-done");
+  refreshDesktopLinkStatus();
+  if (desktopOnboardingContinueBtn) {
+    desktopOnboardingContinueBtn.hidden = false;
+    desktopOnboardingContinueBtn.disabled = false;
+  }
+  updateDesktopNavLabel();
+}
+
+async function pollDesktopOnboardingConnection() {
+  clearDesktopOnboardingPoll();
+  const deadline = Date.now() + 45000;
+
+  const tick = async () => {
+    if (!desktopOnboardingActive) return;
+    let ready = desktopHasToken;
+    try {
+      if (executionMode === "local") {
+        const res = await api("/api/status");
+        const data = await res.json();
+        applyDesktopFeedback(data);
+        ready = ready && agentOnline;
+      } else if (window.sendlineDesktop?.getAgentStatus) {
+        const status = await window.sendlineDesktop.getAgentStatus();
+        ready = ready && Boolean(status?.connected);
+      }
+    } catch (err) {
+      if (err && err.message === "auth") return;
+    }
+
+    if (ready) {
+      finishDesktopOnboardingConnect();
+      return;
+    }
+
+    if (Date.now() >= deadline) {
+      resetDesktopOnboardingUi();
+      setOnboardingStatus(
+        desktopOnboardingStatusEl,
+        "Could not confirm this PC in time. Check your network and use Link this PC again.",
+        "error"
+      );
+      return;
+    }
+
+    desktopOnboardingPollTimer = setTimeout(() => {
+      tick().catch(() => {});
+    }, 2000);
+  };
+
+  await tick();
+}
+
+function beginDesktopOnboardingConnectStep() {
+  if (desktopOnboardingStep1El) desktopOnboardingStep1El.hidden = true;
+  if (desktopOnboardingStep2El) desktopOnboardingStep2El.hidden = false;
+  if (desktopOnboardingStep1LabelEl) {
+    desktopOnboardingStep1LabelEl.classList.remove("is-active");
+    desktopOnboardingStep1LabelEl.classList.add("is-done");
+  }
+  if (desktopOnboardingStep2LabelEl) desktopOnboardingStep2LabelEl.classList.add("is-active");
+  pollDesktopOnboardingConnection().catch(() => {
+    setOnboardingStatus(desktopOnboardingStep2StatusEl, "Could not verify connection.", "error");
+  });
+}
+
+async function linkDesktopFromOnboarding() {
+  await registerDesktopAgent({ forOnboarding: true });
+}
+
+const desktopDialogTitleEl = document.getElementById("desktopDialogTitle");
+const desktopDialogLeadEl = document.getElementById("desktopDialogLead");
+const desktopRegisterLabelFieldEl = document.getElementById("desktopRegisterLabelField");
+const desktopDialogListWrapEl = document.querySelector("#desktopDialog .desktop-dialog__list-wrap");
+const desktopRegisterActionsEl = desktopRegisterBtn?.closest(".desktop-dialog__actions");
+
+/** @param {"linked" | "link" | "manage"} mode */
+function setDesktopDialogLayout(mode) {
+  const linkedSimple = mode === "linked";
+  if (desktopDialogTitleEl) {
+    desktopDialogTitleEl.textContent = linkedSimple ? "Computer linked" : "Sendline Desktop";
+  }
+  if (desktopDialogLeadEl) {
+    if (linkedSimple) {
+      desktopDialogLeadEl.textContent = "";
+      desktopDialogLeadEl.hidden = true;
+    } else {
+      desktopDialogLeadEl.hidden = false;
+      desktopDialogLeadEl.textContent =
+        mode === "link" && isSendlineDesktop
+          ? "Name this PC and link it to your account. The token is saved on this computer automatically."
+          : "Generate an agent token here, paste it once into Sendline Desktop (tray → Settings), then keep the app open while you run campaigns.";
+    }
+  }
+  if (desktopRegisterLabelFieldEl) desktopRegisterLabelFieldEl.hidden = linkedSimple;
+  if (desktopRegisterActionsEl) desktopRegisterActionsEl.hidden = linkedSimple;
+  if (desktopDialogListWrapEl) desktopDialogListWrapEl.hidden = linkedSimple || mode === "link";
+  desktopDialogEl?.classList.toggle("desktop-dialog--linked-only", linkedSimple);
+}
+
+function openDesktopDialog() {
+  if (!desktopDialogEl || typeof desktopDialogEl.showModal !== "function") return;
+  const linkedOnDesktop = isSendlineDesktop && desktopHasToken;
+  setDesktopDialogLayout(linkedOnDesktop ? "linked" : isSendlineDesktop ? "link" : "manage");
+  desktopTokenRevealEl.hidden = true;
+  if (desktopNewTokenEl) desktopNewTokenEl.value = "";
+  setDesktopDialogStatus("", "");
+  if (desktopRegisterLabelEl) desktopRegisterLabelEl.value = defaultDesktopAgentLabel();
+  desktopDialogEl.showModal();
+  if (linkedOnDesktop) return;
+  loadAgentTokens().catch(() => {
+    setDesktopDialogStatus("Could not load desktop tokens.", "error");
+  });
+}
+
+function closeDesktopDialog() {
+  desktopDialogEl?.close();
+}
+
+function renderAgentTokenList(tokens) {
+  if (!desktopTokenListEl || !desktopTokenEmptyEl) return;
+  const rows = Array.isArray(tokens) ? tokens : [];
+  desktopTokenListEl.innerHTML = "";
+  if (!rows.length) {
+    desktopTokenEmptyEl.hidden = false;
+    desktopTokenListEl.hidden = true;
+    return;
+  }
+  desktopTokenEmptyEl.hidden = true;
+  desktopTokenListEl.hidden = false;
+  for (const row of rows) {
+    const li = document.createElement("li");
+    li.className = "desktop-token-item";
+    const label = document.createElement("span");
+    label.className = "desktop-token-item__label";
+    label.textContent = row.label || "Desktop";
+    const meta = document.createElement("span");
+    meta.className = "desktop-token-item__meta";
+    const status = row.active ? "Active" : "Revoked";
+    const seen = row.active ? formatAgentTime(row.last_seen_at) : formatAgentTime(row.revoked_at);
+    meta.textContent =
+      status +
+      (row.active ? " · Last seen " + (row.last_seen_at ? seen : "never") : " · Revoked " + seen);
+    li.append(label, meta);
+    if (row.active) {
+      const revokeBtn = document.createElement("button");
+      revokeBtn.type = "button";
+      revokeBtn.className = "text-btn";
+      revokeBtn.textContent = "Revoke";
+      revokeBtn.addEventListener("click", () => revokeAgentToken(row.id));
+      li.append(revokeBtn);
+    }
+    desktopTokenListEl.append(li);
+  }
+}
+
+async function loadAgentTokens() {
+  const res = await api("/api/agent/tokens");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "load tokens");
+  }
+  renderAgentTokenList(data.tokens);
+}
+
+/** @param {{ forOnboarding?: boolean }} [options] */
+async function registerDesktopAgent(options = {}) {
+  const forOnboarding = Boolean(options.forOnboarding);
+  const trimmed = resolveDesktopRegisterLabel(options);
+  if (trimmed == null) return;
+  if (!trimmed) {
+    if (forOnboarding) {
+      setOnboardingStatus(desktopOnboardingStatusEl, "Computer name is required.", "error");
+    } else {
+      setDesktopDialogStatus("Computer name is required.", "error");
+    }
+    return;
+  }
+  const registerBtn = forOnboarding ? desktopOnboardingLinkBtn : desktopRegisterBtn;
+  if (registerBtn) registerBtn.disabled = true;
+  if (forOnboarding) {
+    setOnboardingStatus(desktopOnboardingStatusEl, "Creating token…", "ok");
+  } else {
+    setDesktopDialogStatus("Creating token…", "ok");
+  }
+  try {
+    const res = await apiPostJson("/api/agent/register", { label: trimmed });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.error || "Could not create token.";
+      if (forOnboarding) setOnboardingStatus(desktopOnboardingStatusEl, msg, "error");
+      else setDesktopDialogStatus(msg, "error");
+      return;
+    }
+    if (desktopNewTokenEl) desktopNewTokenEl.value = data.token || "";
+    if (desktopTokenRevealEl) desktopTokenRevealEl.hidden = !data.token;
+    if (isSendlineDesktop && data.token) {
+      const saved = await saveDesktopAgentConfig({ token: data.token });
+      if (!saved) {
+        const msg = "Token created but could not save on this PC. Use tray → Settings to paste it.";
+        if (forOnboarding) setOnboardingStatus(desktopOnboardingStatusEl, msg, "error");
+        else setDesktopDialogStatus(msg, "error");
+        return;
+      }
+      if (forOnboarding) {
+        setOnboardingStatus(desktopOnboardingStatusEl, "Token saved on this PC.", "ok");
+        beginDesktopOnboardingConnectStep();
+      } else {
+        setDesktopDialogLayout("linked");
+        setDesktopDialogStatus("", "");
+      }
+    } else {
+      setDesktopDialogStatus("Paste this token into Sendline Desktop → Settings, then save.", "ok");
+    }
+    await loadAgentTokens();
+  } catch (err) {
+    if (err && err.message === "auth") return;
+    if (forOnboarding) setOnboardingStatus(desktopOnboardingStatusEl, "Could not reach Sendline server.", "error");
+    else setDesktopDialogStatus("Could not reach Sendline server.", "error");
+  } finally {
+    if (registerBtn) registerBtn.disabled = false;
+  }
+}
+
+async function revokeAgentToken(id) {
+  if (!window.confirm("Revoke this desktop token? That computer will stop running campaigns until you link it again.")) {
+    return;
+  }
+  try {
+    const res = await apiPostJson("/api/agent/revoke", { id });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setDesktopDialogStatus(data.error || "Could not revoke token.", "error");
+      return;
+    }
+    setDesktopDialogStatus("Token revoked.", "ok");
+    await loadAgentTokens();
+  } catch (err) {
+    if (err && err.message === "auth") return;
+    setDesktopDialogStatus("Could not reach Sendline server.", "error");
+  }
+}
+
+async function copyDesktopToken() {
+  const value = desktopNewTokenEl?.value || "";
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    setDesktopDialogStatus("Token copied to clipboard.", "ok");
+  } catch {
+    desktopNewTokenEl?.select();
+    setDesktopDialogStatus("Select the token and copy manually.", "ok");
+  }
 }
 
 function isActiveStatus(status) {
@@ -81,6 +566,13 @@ let linkedinSavedOnServer = false;
 let currentJobId = null;
 let hadActiveJob = false;
 let jobPeopleCount = 0;
+let executionMode = "server";
+let agentOnline = false;
+let desktopHasToken = false;
+let desktopOnboardingActive = false;
+let desktopOnboardingPollTimer = null;
+let desktopStatusTimer = null;
+let csrfToken = null;
 
 const STATUS_ICONS = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>',
@@ -691,7 +1183,8 @@ async function clearAttachment() {
 }
 
 function setRunningUi(active) {
-  runBtn.disabled = active;
+  const desktopBlocked = executionMode === "local" && !agentOnline;
+  runBtn.disabled = active || desktopBlocked;
   stopBtn.hidden = !active;
   uploadAttachmentBtn.disabled = active || attachmentUploading;
   clearAttachmentBtn.disabled = active;
@@ -702,9 +1195,168 @@ function setRunningUi(active) {
   if (linkedinRemoveBtnForm) linkedinRemoveBtnForm.disabled = active;
   if (!active) stopBtn.disabled = false;
   if (active) pulseEl.dataset.state = "running";
+  syncDesktopLiveLogPulse();
+}
+
+function syncDesktopLiveLogPulse() {
+  if (!isSendlineDesktop || !pulseEl) return;
+  const jobState = pulseEl.dataset.state;
+  if (lastDesktopAgentStatus?.phase === "error") {
+    pulseEl.dataset.state = "error";
+    return;
+  }
+  if (
+    jobState === "running" ||
+    lastDesktopAgentStatus?.phase === "running" ||
+    lastDesktopAgentStatus?.phase === "stopping"
+  ) {
+    pulseEl.dataset.state = "running";
+    return;
+  }
+  if (jobState === "error") {
+    pulseEl.dataset.state = "error";
+    return;
+  }
+  pulseEl.dataset.state = "idle";
+}
+
+function applyDesktopFeedback(data) {
+  if (data.execution_mode) executionMode = data.execution_mode;
+  if (typeof data.agent_online === "boolean") agentOnline = data.agent_online;
+  updateDesktopBanner();
+  refreshDesktopLinkStatus();
+}
+
+function updateDesktopBanner() {
+  if (!desktopBannerEl) return;
+  const needsDesktop = executionMode === "local" && !agentOnline;
+  desktopBannerEl.hidden = !needsDesktop;
+  if (desktopBannerTextEl && isSendlineDesktop) {
+    desktopBannerTextEl.textContent =
+      "Link this PC to run campaigns locally, or paste an agent token in tray → Settings.";
+  }
+  if (desktopBannerLinkBtn && isSendlineDesktop) {
+    desktopBannerLinkBtn.textContent = "Link this PC";
+  }
+  if (desktopOnboardingActive && needsDesktop) {
+    desktopBannerEl.hidden = true;
+  }
+}
+
+function updateDesktopNavLabel() {
+  if (!desktopNavBtn) return;
+  const linked = isSendlineDesktop && desktopHasToken;
+  desktopNavBtn.textContent = linked ? "Linked" : "Desktop";
+  desktopNavBtn.setAttribute(
+    "aria-label",
+    linked ? "This PC is linked" : "Link or manage Sendline Desktop"
+  );
+  desktopNavBtn.classList.toggle("app-nav__link--linked", linked);
+}
+
+function syncDesktopNav() {
+  const signedIn = document.body.classList.contains("user-signed-in");
+  if (desktopNavBtn) desktopNavBtn.hidden = !signedIn || isSendlineDesktop;
+  if (desktopLinkField) desktopLinkField.hidden = !signedIn || isSendlineDesktop;
+  updateDesktopNavLabel();
+  refreshDesktopLinkStatus();
+}
+
+function refreshDesktopLinkStatus() {
+  if (!isSendlineDesktop) return;
+  const signedIn = document.body.classList.contains("user-signed-in");
+  const linked = Boolean(desktopHasToken);
+  if (desktopLinkedChipEl) {
+    desktopLinkedChipEl.hidden = !signedIn || !linked;
+    desktopLinkedChipEl.setAttribute(
+      "aria-label",
+      linked ? "This computer is linked to Sendline" : "This computer is not linked"
+    );
+  }
+  renderDesktopBottomStatusBar(lastDesktopAgentStatus);
+}
+
+function formatDesktopAgentStatus(status) {
+  const linked = Boolean(desktopHasToken || status?.connected);
+  if (!linked) {
+    return { text: "Not linked — Link this PC or tray → Settings", tone: "warn" };
+  }
+  if (!status) {
+    return { text: "This PC linked · connecting agent…", tone: "linked" };
+  }
+  if (status.phase === "running" || status.phase === "stopping") {
+    const jobHint = status.job_id != null ? ` · job ${status.job_id}` : "";
+    const verb = status.phase === "stopping" ? "Stopping" : "Running";
+    return { text: `${verb} on this PC${jobHint}`, tone: "running" };
+  }
+  if (status.phase === "error") {
+    return {
+      text: status.last_error ? `Linked · agent error — ${status.last_error}` : "Linked · agent error",
+      tone: "error",
+    };
+  }
+  if (executionMode === "local" && !agentOnline) {
+    return { text: "This PC linked · open Sendline Desktop to run campaigns", tone: "linked" };
+  }
+  return { text: "This PC linked · ready", tone: "linked" };
+}
+
+function renderDesktopBottomStatusBar(status) {
+  if (!isSendlineDesktop || !desktopStatusBarEl) return;
+  if (!document.body.classList.contains("user-signed-in")) {
+    desktopStatusBarEl.hidden = true;
+    return;
+  }
+  desktopStatusBarEl.hidden = false;
+  const { text, tone } = formatDesktopAgentStatus(status);
+  if (desktopStatusTextEl) desktopStatusTextEl.textContent = text;
+  desktopStatusBarEl.dataset.tone = tone || "idle";
+  if (desktopStatusVersionEl) {
+    const version = window.sendlineDesktop?.version;
+    desktopStatusVersionEl.textContent = version ? `v${version}` : "";
+  }
+  syncDesktopLiveLogPulse();
+}
+
+function initDesktopBottomStatusBar() {
+  if (!isSendlineDesktop || !window.sendlineDesktop.onAgentStatus) return;
+  window.sendlineDesktop.onAgentStatus((status) => {
+    lastDesktopAgentStatus = status;
+    renderDesktopBottomStatusBar(status);
+  });
+}
+
+function insertNameAtMessageCursor() {
+  const token = "{name}";
+  const el = messageEl;
+  if (!el) return;
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? el.value.length;
+  const before = el.value.slice(0, start);
+  const after = el.value.slice(end);
+  el.value = before + token + after;
+  const next = start + token.length;
+  el.focus();
+  el.setSelectionRange(next, next);
+}
+
+function startDesktopStatusPoll() {
+  if (desktopStatusTimer) clearInterval(desktopStatusTimer);
+  desktopStatusTimer = null;
+  if (executionMode !== "local") return;
+  desktopStatusTimer = setInterval(async () => {
+    try {
+      const res = await api("/api/status");
+      const data = await res.json();
+      applyDesktopFeedback(data);
+    } catch (err) {
+      if (err && err.message === "auth") return;
+    }
+  }, 15000);
 }
 
 function applyJobState(data) {
+  applyDesktopFeedback(data);
   const status = data.job_status || (data.running ? "running" : "idle");
   const mine = Boolean(data.is_mine);
   const active = mine && isActiveStatus(status);
@@ -732,6 +1384,7 @@ function applyJobState(data) {
     setStatus("Stopping — closing Chrome…", "running");
     pulseEl.dataset.state = "running";
   }
+  syncDesktopLiveLogPulse();
   return { active, status, mine };
 }
 
@@ -757,6 +1410,11 @@ function logLineClass(line) {
 function syncLogEmpty() {
   if (!logEmptyEl || !logEl) return;
   logEmptyEl.hidden = logEl.childNodes.length > 0;
+  if (isSendlineDesktop) {
+    const titleEl = logEmptyEl.querySelector(".log-empty-title");
+    if (titleEl) titleEl.textContent = "Waiting for a run…";
+    if (logEmptyHintEl) logEmptyHintEl.hidden = true;
+  }
 }
 
 function appendLogs(lines) {
@@ -800,6 +1458,7 @@ async function pollLogs() {
         pulseEl.dataset.state = "error";
         setStatus("Worker failed — check the log", "error");
       }
+      syncDesktopLiveLogPulse();
       stopRequested = false;
       hadActiveJob = false;
     }
@@ -975,6 +1634,23 @@ logoutBtn.addEventListener("click", async () => {
   window.location.href = "/login";
 });
 
+desktopOnboardingLinkBtn?.addEventListener("click", () => linkDesktopFromOnboarding());
+desktopOnboardingContinueBtn?.addEventListener("click", () => closeDesktopOnboarding());
+desktopOnboardingDialogEl?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+});
+desktopNavBtn?.addEventListener("click", () => openDesktopDialog());
+desktopWorkspaceBtn?.addEventListener("click", () => openDesktopDialog());
+desktopBannerLinkBtn?.addEventListener("click", () => openDesktopDialog());
+desktopDialogCloseBtn?.addEventListener("click", () => closeDesktopDialog());
+desktopRegisterBtn?.addEventListener("click", () => registerDesktopAgent());
+desktopCopyTokenBtn?.addEventListener("click", () => copyDesktopToken());
+insertNameBtn?.addEventListener("click", () => insertNameAtMessageCursor());
+desktopDialogEl?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeDesktopDialog();
+});
+
 async function boot() {
   try {
     const meRes = await api("/api/me");
@@ -991,10 +1667,17 @@ async function boot() {
       document.body.classList.add("user-signed-in");
       adminLinkEl.hidden = meData.user.role !== "admin";
     }
+    if (meData.csrf) csrfToken = meData.csrf;
+    syncDesktopNav();
+    applyDesktopFeedback(meData);
+    initDesktopBottomStatusBar();
+    await loadDesktopAgentConfigField();
+    maybeShowDesktopOnboarding();
     await loadConfig();
     const statusRes = await api("/api/status");
     const statusData = await statusRes.json();
     const state = applyJobState(statusData);
+    startDesktopStatusPoll();
     if (state.active) {
       hadActiveJob = true;
       startPolling();
