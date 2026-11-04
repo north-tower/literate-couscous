@@ -27,13 +27,14 @@ Copy from .env.signing.example / electron-builder.local.example.yml
         }
     }
 
-    $builderArgs = @("electron-builder", "--win")
+    $builderArgs = @("electron-builder", "--win", "--publish", "never")
     if ($Signed -and (Test-Path (Join-Path $root "electron-builder.local.yml"))) {
         $builderArgs = @(
             "electron-builder",
             "-c", "electron-builder.yml",
             "-c", "electron-builder.local.yml",
-            "--win"
+            "--win",
+            "--publish", "never"
         )
     }
 

@@ -1,6 +1,8 @@
 appId: com.sendline.desktop
 productName: Sendline Desktop
 copyright: Copyright © Sendline
+# CI uploads artifacts; do not require .git/config or package.json repository for publish.
+publish: never
 
 directories:
   output: dist
