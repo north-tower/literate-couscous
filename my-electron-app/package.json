@@ -2,6 +2,10 @@
   "name": "my-electron-app",
   "version": "1.0.0",
   "description": "Sendline Desktop — local agent shell for hosted Sendline API",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/north-tower/literate-couscous.git"
+  },
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",

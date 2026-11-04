@@ -96,6 +96,9 @@ jobs:
 
       - name: Build .dmg
         working-directory: my-electron-app
+        env:
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
         run: |
           pnpm install --frozen-lockfile
           pnpm run dist:mac

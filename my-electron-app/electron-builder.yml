@@ -1,6 +1,8 @@
 appId: com.sendline.desktop
 productName: Sendline Desktop
 copyright: Copyright © Sendline
+# Artifact-only builds (CI uploads dist/); avoids GH_TOKEN auto-detect + update metadata.
+publish: null
 
 directories:
   output: dist
