@@ -1,0 +1,30 @@
+node_modules/
+
+# Build output (CI produces these; do not commit)
+dist/
+out/
+*.blockmap
+
+# Local env & code signing (never commit)
+.env
+.env.*
+!.env.example
+.env.signing
+electron-builder.local.yml
+*.pfx
+*.p12
+
+# PyInstaller copy for local `dist:win` / `dist:mac` (CI builds fresh)
+resources/sendline-worker/*
+!resources/sendline-worker/.gitkeep
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

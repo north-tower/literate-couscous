@@ -16,6 +16,7 @@ import auth
 import db
 import egress
 import pace
+import platform_chrome
 import vault
 
 ATTACHMENT_DOWNLOAD_TTL_SEC = 3600
@@ -66,55 +67,11 @@ def _worker_python() -> str:
     return sys.executable
 
 
-def _pids_on_port(port: int) -> list[int]:
-    try:
-        result = subprocess.run(
-            ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        return []
-    pids: list[int] = []
-    needle = f":{port}"
-    for line in (result.stdout or "").splitlines():
-        upper = line.upper()
-        if "LISTEN" not in upper:
-            continue
-        if needle not in line:
-            continue
-        parts = line.split()
-        if not parts:
-            continue
-        try:
-            pid = int(parts[-1])
-        except ValueError:
-            continue
-        if pid and pid not in pids:
-            pids.append(pid)
-    return pids
-
-
-def kill_pid_tree(pid: int | None) -> None:
-    if not pid:
-        return
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/PID", str(pid), "/T"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        return
-    try:
-        os.kill(int(pid), 15)
-    except OSError:
-        pass
+kill_pid_tree = platform_chrome.kill_pid_tree
 
 
 def kill_debug_port_listeners(port: int = DEBUG_PORT) -> None:
-    for pid in _pids_on_port(port):
+    for pid in platform_chrome.pids_on_port(port):
         kill_pid_tree(pid)
 
 

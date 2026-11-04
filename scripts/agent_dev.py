@@ -68,7 +68,9 @@ def worker_python() -> str:
     candidates = [
         sys.executable,
         str(REPO_ROOT / "venv" / "Scripts" / "python.exe"),
+        str(REPO_ROOT / "venv" / "bin" / "python"),
         str(Path.home() / "hailmary" / "venv" / "Scripts" / "python.exe"),
+        str(Path.home() / "hailmary" / "venv" / "bin" / "python"),
     ]
     seen: set[str] = set()
     for candidate in candidates:

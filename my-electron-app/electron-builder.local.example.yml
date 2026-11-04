@@ -1,0 +1,9 @@
+# Copy to electron-builder.local.yml (gitignored) when signing via Windows cert store.
+# Do not commit this file with real subject names if your policy treats them as sensitive.
+#
+# Requires the code-signing cert installed under Current User → Personal (or Local Machine).
+# Find subject: certmgr.msc, or: Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert
+
+win:
+  signtoolOptions:
+    certificateSubjectName: "Your Company Legal Name"

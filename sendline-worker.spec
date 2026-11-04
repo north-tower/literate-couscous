@@ -25,6 +25,7 @@ hidden = (
         "pace",
         "db",
         "vault",
+        "platform_chrome",
         "cryptography",
         "argon2",
     ]

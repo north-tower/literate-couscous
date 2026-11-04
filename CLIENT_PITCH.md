@@ -2,7 +2,7 @@
 
 **One-page briefing for demos and stakeholder meetings**  
 **Product type:** Local LinkedIn Messaging outreach tool (operator MVP)  
-**Runs on:** Windows PC with Google Chrome (localhost only — not a cloud SaaS)
+**Runs on:** Mac or Windows with Google Chrome (localhost automation — not a cloud SaaS)
 
 ---
 

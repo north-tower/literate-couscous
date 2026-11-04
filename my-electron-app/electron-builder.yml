@@ -1,0 +1,55 @@
+appId: com.sendline.desktop
+productName: Sendline Desktop
+copyright: Copyright © Sendline
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - electron/**/*
+  - package.json
+  - "!docs/**"
+  - "!scripts/**"
+  - "!resources/**"
+  - "!.env*"
+
+extraResources:
+  - from: resources/sendline-worker
+    to: sendline-worker
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+  # Also sign bundled worker DLLs when CSC_LINK / certificateSubjectName is configured (Phase 4.2)
+  signExts:
+    - .dll
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    timeStampServer: http://timestamp.digicert.com
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Sendline Desktop
+  uninstallDisplayName: Sendline Desktop
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  icon: build/icon.png
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+dmg:
+  title: Sendline Desktop

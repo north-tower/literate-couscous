@@ -13,6 +13,7 @@ from typing import Iterable, Optional
 
 import egress
 import pace
+import platform_chrome
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -354,18 +355,6 @@ def _pid_file() -> Path | None:
     return JOB_DIR / "chrome.pid"
 
 
-def _find_chrome_exe() -> Path:
-    candidates = [
-        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Google/Chrome/Application/chrome.exe",
-        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "Google/Chrome/Application/chrome.exe",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
-    ]
-    for path in candidates:
-        if path.is_file():
-            return path
-    raise FileNotFoundError("Could not find chrome.exe")
-
-
 def _port_open(host: str, port: int) -> bool:
     try:
         with socket.create_connection((host, port), timeout=1):
@@ -383,52 +372,6 @@ def _wait_for_port(host: str, port: int, timeout: float = 45) -> None:
             return
         time.sleep(0.4)
     raise TimeoutException(f"Chrome debug port {host}:{port} did not open in time.")
-
-
-def _pids_listening_on(port: int) -> list[int]:
-    try:
-        result = subprocess.run(
-            ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        return []
-    pids: list[int] = []
-    needle = f":{port}"
-    for line in (result.stdout or "").splitlines():
-        if "LISTEN" not in line.upper():
-            continue
-        if needle not in line:
-            continue
-        parts = line.split()
-        if not parts:
-            continue
-        try:
-            pid = int(parts[-1])
-        except ValueError:
-            continue
-        if pid and pid not in pids:
-            pids.append(pid)
-    return pids
-
-
-def _kill_pid_tree(pid: int | None) -> None:
-    if not pid:
-        return
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/PID", str(pid), "/T"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        return
-    try:
-        os.kill(int(pid), 15)
-    except OSError:
-        pass
 
 
 def _read_chrome_pid() -> int | None:
@@ -454,10 +397,10 @@ def _kill_job_chrome() -> None:
     pid = _read_chrome_pid()
     if _chrome_proc is not None and _chrome_proc.poll() is None:
         pid = pid or _chrome_proc.pid
-    _kill_pid_tree(pid)
-    for listener in _pids_listening_on(DEBUG_PORT):
+    platform_chrome.kill_pid_tree(pid)
+    for listener in platform_chrome.pids_on_port(DEBUG_PORT):
         if listener != pid:
-            _kill_pid_tree(listener)
+            platform_chrome.kill_pid_tree(listener)
     _chrome_proc = None
     time.sleep(1)
 
@@ -506,7 +449,7 @@ def start_or_attach_chrome() -> webdriver.Chrome:
         print("Closing a leftover automation Chrome on the debug port...")
         _kill_job_chrome()
 
-    chrome_exe = _find_chrome_exe()
+    chrome_exe = platform_chrome.find_chrome_exe()
     cmd = [
         str(chrome_exe),
         f"--remote-debugging-port={DEBUG_PORT}",

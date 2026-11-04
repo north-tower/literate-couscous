@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sendline Desktop Settings</title>
+    <style>
+      :root {
+        --ink: #134e4a;
+        --ink-soft: #475569;
+        --paper: #f0fdfa;
+        --line: rgba(19, 78, 74, 0.12);
+        --accent: #0d9488;
+        --accent-deep: #0f766e;
+      }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        margin: 0;
+        padding: 24px;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 600;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 16px;
+        color: var(--ink);
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 6px;
+        padding: 8px 10px;
+        font-size: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+      textarea {
+        min-height: 72px;
+        font-family: ui-monospace, monospace;
+      }
+      p.hint {
+        font-size: 12px;
+        color: var(--ink-soft);
+        margin-top: 8px;
+        line-height: 1.45;
+      }
+      button {
+        margin-top: 20px;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--accent-deep);
+      }
+      a {
+        color: var(--accent-deep);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Desktop agent</h1>
+    <p class="hint">
+      In the main Sendline window, open <strong>Desktop</strong> in the nav → <strong>Link this computer</strong>.
+      Copy the token once, paste it below, and save. Stored with OS encryption when available.
+    </p>
+    <label for="apiUrl">API URL</label>
+    <input id="apiUrl" type="url" autocomplete="off" />
+    <label for="token">Agent token</label>
+    <textarea id="token" placeholder="Leave blank to keep existing token" autocomplete="off"></textarea>
+    <p class="hint" id="registerLink"></p>
+    <button type="button" id="save">Save</button>
+    <script>
+      const apiInput = document.getElementById('apiUrl');
+      const tokenInput = document.getElementById('token');
+      const registerLink = document.getElementById('registerLink');
+      document.getElementById('save').addEventListener('click', () => {
+        window.sendlineSettings.save({
+          apiUrl: apiInput.value,
+          token: tokenInput.value,
+        });
+      });
+      window.sendlineSettings.onInit((data) => {
+        apiInput.value = data.apiUrl || '';
+        registerLink.innerHTML =
+          'Open hosted UI: <a href="#" id="openUi">' + (data.registerHint || '') + '</a>';
+        document.getElementById('openUi').addEventListener('click', (e) => {
+          e.preventDefault();
+          window.open(data.registerHint, '_blank');
+        });
+        if (data.hasToken) {
+          tokenInput.placeholder = 'Token on file — paste only to replace';
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -243,20 +243,20 @@
 
 ### 5.1 Port `worker.py` OS abstraction
 
-- [ ] **5.1.1** Add `platform_chrome.py`: `find_chrome_exe()`, `kill_pid_tree()`, `pids_on_port()`.
-- [ ] **5.1.2** Windows: keep current `taskkill` / `netstat` / Program Files paths.
-- [ ] **5.1.3** macOS: Chrome.app path, `kill -9`, `lsof -i :9222`.
-- [ ] **5.1.4** Replace direct calls in `worker.py` and any agent kill logic in `jobs.py` used locally.
+- [x] **5.1.1** Add `platform_chrome.py`: `find_chrome_exe()`, `kill_pid_tree()`, `pids_on_port()`.
+- [x] **5.1.2** Windows: keep current `taskkill` / `netstat` / Program Files paths.
+- [x] **5.1.3** macOS: Chrome.app path, `kill -9`, `lsof -i :9222`.
+- [x] **5.1.4** Replace direct calls in `worker.py` and any agent kill logic in `jobs.py` used locally.
 - [ ] **5.1.5** Test pyperclip on macOS.
 
 ### 5.2 Build worker on Mac
 
-- [ ] **5.2.1** PyInstaller build on macOS CI or local.
-- [ ] **5.2.2** Bundle in Electron `extraResources` per arch (`arm64`, `x64`).
+- [x] **5.2.1** PyInstaller build on macOS CI or local (`scripts/build-worker.sh`).
+- [x] **5.2.2** Bundle in Electron `extraResources` per arch (`arm64`, `x64`).
 
 ### 5.3 electron-builder macOS
 
-- [ ] **5.3.1** Target `dmg`, hardened runtime.
+- [x] **5.3.1** Target `dmg`, hardened runtime.
 - [ ] **5.3.2** Apple Developer ID signing + notarization (`notarize` in builder).
 - [ ] **5.3.3** QA: Gatekeeper install, LinkedIn login, stop, attachments.
 

@@ -1,0 +1,117 @@
+# Build Sendline Desktop (.dmg) on macOS: PyInstaller worker + electron-builder.
+#
+# Layout on the runner (required for copy-worker.mjs):
+#   $GITHUB_WORKSPACE/          <- this repo (automate)
+#   $GITHUB_WORKSPACE/my-electron-app/
+#
+# Provide the desktop app either by committing my-electron-app/ here or by setting
+# repository variable SENDLINE_DESKTOP_REPO (owner/name) or workflow input.
+
+name: Build Sendline Desktop (macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      desktop_repository:
+        description: "GitHub owner/repo for Electron app (checkout → my-electron-app/). Empty = use my-electron-app/ in this repo."
+        required: false
+        type: string
+      macos_runner:
+        description: "GitHub-hosted macOS label"
+        required: false
+        default: macos-14
+        type: choice
+        options:
+          - macos-14
+          - macos-15
+          - macos-13
+  push:
+    tags:
+      - "desktop-v*"
+      - "sendline-desktop-v*"
+
+concurrency:
+  group: dist-mac-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-macos:
+    runs-on: ${{ inputs.macos_runner || 'macos-14' }}
+    timeout-minutes: 90
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout automate (this repo)
+        uses: actions/checkout@v4
+
+      - name: Checkout Sendline Desktop (Electron)
+        if: inputs.desktop_repository != '' || vars.SENDLINE_DESKTOP_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.desktop_repository || vars.SENDLINE_DESKTOP_REPO }}
+          path: my-electron-app
+          token: ${{ secrets.SENDLINE_DESKTOP_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Verify desktop app layout
+        run: |
+          if [ ! -f my-electron-app/package.json ]; then
+            echo "::error::Missing my-electron-app/package.json."
+            echo "Commit the Electron app under my-electron-app/ in this repo, or set:"
+            echo "  - workflow input desktop_repository, or"
+            echo "  - repository variable SENDLINE_DESKTOP_REPO (owner/repo)"
+            echo "For a private desktop repo, add secret SENDLINE_DESKTOP_PAT with repo read access."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Build sendline-worker (PyInstaller)
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          bash scripts/build-worker.sh
+          test -x dist/sendline-worker/sendline-worker || test -f dist/sendline-worker/sendline-worker
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: my-electron-app/pnpm-lock.yaml
+
+      - name: Build .dmg
+        working-directory: my-electron-app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run dist:mac
+
+      - name: Upload macOS installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: sendline-desktop-macos-${{ github.run_number }}
+          path: |
+            my-electron-app/dist/*.dmg
+            my-electron-app/dist/*.zip
+            my-electron-app/dist/mac/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          echo "### Sendline Desktop (macOS)" >> "$GITHUB_STEP_SUMMARY"
+          ls -la my-electron-app/dist >> "$GITHUB_STEP_SUMMARY" || true

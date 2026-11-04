@@ -1,0 +1,36 @@
+{
+  "name": "my-electron-app",
+  "version": "1.0.0",
+  "description": "Sendline Desktop — local agent shell for hosted Sendline API",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "copy-worker": "node scripts/copy-worker.mjs",
+    "generate-icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-icon.ps1",
+    "dist:win": "pnpm run copy-worker && electron-builder --win",
+    "dist:mac": "pnpm run copy-worker && electron-builder --mac",
+    "dist:win:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dist-win.ps1 -Signed",
+    "verify:win-signature": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installer-signature.ps1",
+    "verify:win-signature:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installer-signature.ps1 -FailOnUnsigned",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.8.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.0.12"
+  }
+}

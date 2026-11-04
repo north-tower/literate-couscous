@@ -14,7 +14,7 @@ Phase 0 records product and technical choices **before** backend or Electron cod
 | Component | Where it runs |
 |-----------|----------------|
 | Auth, users, campaigns, job queue, vault, SQLite | Hosted `automate/` API |
-| `worker.py`, Selenium, automation Chrome | Operator Windows PC (Electron main process spawns worker) |
+| `worker.py`, Selenium, automation Chrome | Operator **Mac or Windows** PC (Electron main process spawns worker) |
 | Sendline UI (`static/`) | Loaded from hosted origin in Electron (`loadURL`) |
 
 **Rejected for production:** “All-in-one” Electron app that embeds Flask/SQLite locally (acceptable only for isolated dev experiments).
@@ -48,7 +48,7 @@ Phase 0 records product and technical choices **before** backend or Electron cod
 | Mode | Worker spawn |
 |------|----------------|
 | `server` | Today’s behavior: VPS runs `worker.py` via `jobs._spawn` |
-| `local` | VPS queues job only; desktop agent polls work and spawns worker locally |
+| `local` | VPS queues job only; desktop agent polls work and spawns worker **on that Mac or PC**; Chrome opens locally |
 
 Rollout: existing users stay `server` until explicitly set to `local` (see migration M.1–M.3 in transition plan).
 
@@ -56,9 +56,10 @@ Rollout: existing users stay `server` until explicitly set to `local` (see migra
 
 ## 0.5 Chrome — **Confirmed**
 
-**Decision:** Operator installs **Google Chrome** on the PC. Electron installer does **not** bundle Chromium for LinkedIn automation.
+**Decision:** Operator installs **Google Chrome** on the computer. Electron installer does **not** bundle Chromium for LinkedIn automation.
 
-- Worker continues to launch Chrome with a dedicated `--user-data-dir` under `%LOCALAPPDATA%\Sendline\` (or Electron `userData` path per Phase 2).
+- Worker launches Chrome with a dedicated `--user-data-dir` under Electron `userData` (e.g. `%APPDATA%\Sendline Desktop\` on Windows, `~/Library/Application Support/Sendline Desktop/` on macOS).
+- Same behavior in **`execution_mode=local`**: automation Chrome always runs on the linked desktop machine, not on the VPS.
 - Document Chrome as a prerequisite in client handover (Phase 4).
 
 ---
